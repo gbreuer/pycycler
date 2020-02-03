@@ -1,4 +1,3 @@
 ./node_modules/*
 ./src/python/build/*
-./src/python/dist/*
 ./src/env/*
