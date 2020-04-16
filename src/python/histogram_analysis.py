@@ -10,145 +10,52 @@ from numpy import mean, size, zeros, where, transpose
 from scipy import linspace, signal, arange
 from scipy.optimize import curve_fit
 from scipy.integrate import quad
-from math import sqrt,pi
+from scipy.stats import norm
+from math import sqrt,pi,ceil,floor
 from sklearn.neighbors import KernelDensity
 from matplotlib.pyplot import hist, savefig
 import matplotlib.pyplot as plt
 
 def normal_curve(x,a,b,c):
-	return a*np.exp((-(x-b)**2)/(2*(c**2)))/(c)
-	#return a*np.exp((-(x-b)**2)/(2*(c**2)))/(c*np.sqrt(2*pi))
+	return a*norm.pdf(x,b,c)
+#	return a*np.exp((-(x-b)**2)/(2*(c**2)))
 
 def quadratic(x,a,b,c,d):
 	return a*(x-d)**2 + b*(x-d) + c
 
-def run_analysis(data, x_min, x_max):
-	values = data
+def linear(x,a,b,c,d):
+	return b*(x-d) + c
 
-	#fig, ax = plt.subplots(1, 1, sharex=True, sharey=True)
-	#fig.subplots_adjust(hspace=0.05, wspace=0.05)
+def sigmoidal(x,a,b,c,d):
+	return a/(1+np.exp(c*x+b))+d
 
-	#kd = KernelDensity(bandwidth=0.75)
-	kd = KernelDensity(bandwidth=0.50)
+def both_curves(x,a1,a2,b,c1,c2):
+	return a1*np.exp((-(x-b)**2)/(2*(c1**2))) + a2*np.exp((-(x-2*b)**2)/(2*(c2**2)))
 
-	#filter values based on set limits - scale so mean of data is >= 50 so that curve fit works better?
-	mean_val = np.mean(values)
-	scale_x = 1
+def s_phase(x,g1_peak,c,quad_a,quad_b,quad_c,quad_d):
+	offset = max(0.01,2*c)
+	x_vals = np.zeros(len(x))
 
-	if mean_val < 50:
-		scale_x = 50/mean_val
+	g1_start = min(g1_peak+offset,g1_peak*1.4)
+	g2_start = max(1.6*g1_peak,2*g1_peak-offset)
+	#num_peaks = min(max(10,int((g2_start-g1_start)/offset)),50)
+	num_peaks = 50
 
-	#count sub_g1 and sup_g2 values
-	values = np.array(values)
-	total_events = len(values)
-	sub_g1_count = len(np.where(values<x_min)[0])
-	sup_g2_count = len(np.where(values>x_max)[0])
-	filt_values = values[values>x_min]
-	filt_values = filt_values[filt_values<x_max]
-	filt_values *= scale_x
-	values *= scale_x
+	#plot gaussian distributions on quadtratic slope
+	for i in np.linspace(g1_start,g2_start,num_peaks):
+		tmp_results = normal_curve(x, quadratic(x,quad_a,quad_b,quad_c,quad_d),i,c)
+		tmp_results[np.where(tmp_results < 0)] = 0
+		x_vals = np.add(x_vals,tmp_results)
 
-	kd.fit(filt_values[:, None])
-	x_vals = linspace(0,max(values),int(len(values)))[:,None]
-	log_dens = kd.score_samples(x_vals)
-	dens = np.exp(log_dens)
+	return x_vals
 
-	#Identifying first peak:
-	#TODO: Make more robust for >1 max
-	#skip top 5% and bottom 5% of distribution to eliminate garbage mapping at this stage
-	g1_max_index = where(dens==max(dens))[0][0]
-	g2_max_index = None
+def all_curves(x,a1,a2,b,c,quad_a,quad_b,quad_c,quad_d):
+    return normal_curve(x,a1,b,c)+s_phase(x,b,c,quad_a,quad_b,quad_c,quad_d)+normal_curve(x,a2,2*b,c)
 
-	g1_sd_diff = g2_sd_diff = 0
-
-	#determine location of peak (left or right)
-	#TODO: See if this is right?
-	try:
-		upper_max = max(dens[int(1.8*g1_max_index):int(2.2*g1_max_index)])
-	except:
-		upper_max = -1
-	try:
-		lower_max = max(dens[int(g1_max_index/2.2):int(g1_max_index/1.8)])
-	except:
-		lower_max = -1
-
-	#TODO: More screening to make sure right peak is chosen rather than simple max...
-	if upper_max < lower_max:
-		g2_max_index = g1_max_index
-		g1_max_index = where(dens==lower_max)[0][0]
-	else:
-		g2_max_index = where(dens==upper_max)[0][0]
-
-	for i in range(len(dens[:g1_max_index])):
-		if dens[g1_max_index-i] < 0.6*dens[g1_max_index]:
-			g1_sd_diff = i
-			break
-
-	start_guess = [dens[g1_max_index], x_vals[g1_max_index][0], x_vals[g1_max_index][0]-x_vals[g1_max_index-g1_sd_diff][0]]
-
-	#this WAS 3*g1_sd_diff
-	g1_start_index = g1_max_index - int(1.5*g1_sd_diff)
-
-	if g1_start_index < 0:
-		g1_start_index = 0
-
-	x_range = x_vals[g1_start_index:g1_max_index+g1_sd_diff][:,0]
-	y_range = dens[g1_start_index:g1_max_index+g1_sd_diff]
-
-	g1_opt, cov = curve_fit(normal_curve, x_range, y_range, start_guess)
-
-	for i in range(len(dens[g2_max_index:])):
-		if dens[g2_max_index+i] < 0.6*dens[g2_max_index]:
-			g2_sd_diff = i
-			break
-
-	#this WAS 3*g2_sd_diff
-	start_guess = [dens[g2_max_index],x_vals[g2_max_index][0],x_vals[g2_max_index][0]-x_vals[g2_max_index-g2_sd_diff][0]]
-	x_range = x_vals[g2_max_index-int(0.5*g2_sd_diff):g2_max_index+int(1.5*g2_sd_diff)][:,0]
-	y_range = dens[g2_max_index-int(0.5*g2_sd_diff):g2_max_index+int(1.5*g2_sd_diff)]
-
-	g2_opt, cov = curve_fit(normal_curve, x_range, y_range,start_guess)
-
-	#Integrate to get areas: integrate KDE to normalize, then G1 and G2 to subtract
-	start_x = x_vals[g1_start_index]
-
-	g2_end_index = g2_max_index+2*g2_sd_diff
-	if g2_end_index > len(x_vals):
-		print("***WARNING: G2 Peak Extends Beyond X_Vals***")
-		g2_end_index = len(x_vals)
-
-	end_x = x_vals[g2_end_index]
-	#TODO: see what root problem is
-	KDE_area = quad(lambda x: np.exp(kd.score_samples([[x]])), start_x, end_x)
-	g1_area = quad(normal_curve, start_x, x_vals[g1_max_index+2*g1_sd_diff], args=(g1_opt[0],g1_opt[1],g1_opt[2]))
-	g2_area = quad(normal_curve, x_vals[g2_max_index-2*g2_sd_diff], x_vals[g2_max_index+2*g2_sd_diff], args=(g2_opt[0],g2_opt[1],g2_opt[2]))
-
-	g1_pct = g1_area[0]/KDE_area[0]
-	g2_pct = g2_area[0]/KDE_area[0]
-	s_pct = 1-(g1_area[0] + g2_area[0])/KDE_area[0]
-	#img_file = file_location[:file_location.rfind('.')]+'.png'
-
-	#remove scaling factor
-	values /= scale_x
-	filt_values /= scale_x
-
-	#Display graph
-	#ax.fill(x_vals[:, 0], np.exp(log_dens), fc='#AAAAFF')
-	#ax.fill(x_vals, dens, fc='#123B67')
-	#ax.hist(values,int(sqrt(len(values))),density=True,color='#002D5C')
-	#ax.plot(x_vals/scale_x, normal_curve(x_vals/scale_x, g2_opt[0]*scale_x, g2_opt[1]/scale_x, g2_opt[2]/scale_x),color='red')
-	#ax.fill(x_vals/scale_x, normal_curve(x_vals/scale_x, g2_opt[0]*scale_x, g2_opt[1]/scale_x, g2_opt[2]/scale_x),fc='red',alpha=0.7)
-	#ax.plot(x_vals/scale_x, normal_curve(x_vals/scale_x, g1_opt[0]*scale_x, g1_opt[1]/scale_x, g1_opt[2]/scale_x),color='yellow')
-	#ax.fill(np.insert(x_vals/scale_x,0,[0]), np.insert(normal_curve(x_vals/scale_x, g1_opt[0]*scale_x, g1_opt[1]/scale_x, g1_opt[2]/scale_x),0,[0]),fc='yellow', alpha=0.7)
-
-	#with open(file_location[:file_location.rfind('.')]+'.png','w') as f:
-	#	savefig(f,bbox_inches='tight')
-	#plt.close('all')
-
-	return {'g1_pct': g1_pct,'g2_pct': g2_pct, 's_pct': s_pct, 'fig': fig, 'low_count': sub_g1_count, 'high_count': sup_g2_count,'total_count': total_events}
-
-def run_experimental_analysis(data, x_min, x_max, g1_guess, g2_guess, target_range=100.):
+def refined_analysis(data, x_min, x_max, g1_guess, g2_guess, stdev=-1, target_range=100., output_filename=None):
 	raw_values = data
+
+	lock_stdev = (stdev != -1)
 
 	#count sub_g1 and sup_g2 values
 	raw_values = np.array(raw_values).astype(float)
@@ -159,97 +66,105 @@ def run_experimental_analysis(data, x_min, x_max, g1_guess, g2_guess, target_ran
 	filt_values = filt_values[filt_values<x_max]
 
 	#TODO: check math
-	low = np.percentile(filt_values,0.5)
-	filt_values -= low
-	raw_values -= low
-	high = np.percentile(filt_values,99.5)
+	high = np.max(filt_values)
 	filt_values *= target_range/high
 	raw_values *= target_range/high
-	x_min = (x_min - low)*(target_range/high)
-	x_max = (x_max - low)*(target_range/high)
-	g1_guess = (g1_guess - low)*(target_range/high)
-	g2_guess = (g2_guess - low)*(target_range/high)
+	x_min = (x_min)*(target_range/high)
+	x_max = (x_max )*(target_range/high)
+	g1_guess = (g1_guess)*(target_range/high)
+	g2_guess = (g2_guess)*(target_range/high)
+	stdev = (stdev)*(target_range/high)
 
-	fig, ax = plt.subplots(1, 1, sharex=True, sharey=True)
-	fig.subplots_adjust(hspace=0.05, wspace=0.05)
+	if output_filename:
+		fig, ax = plt.subplots(1, 1, sharex=True, sharey=True)
+		fig.subplots_adjust(hspace=0.05, wspace=0.05)
 
 	#Calculate and plot Kernel Density
-	kd = KernelDensity(bandwidth=0.02*target_range)
+	#kd = KernelDensity(bandwidth=0.02*target_range)
+	kd = KernelDensity(bandwidth=0.005*target_range)
 	kd.fit(filt_values[:, None])
 	x_vals = linspace(min(filt_values), max(filt_values), int(len(filt_values)))[:,None]
 	log_dens = kd.score_samples(x_vals)
 	dens = np.exp(log_dens)
-	ax.plot(x_vals,dens)
+	if output_filename:
+		ax.plot(x_vals,dens)
 
 	#Calculate G1
 	g1_peak_value = np.exp(kd.score_samples([[g1_guess]])[0])
-	g1_std = (np.mean(filt_values)-g1_guess)/2
-	start_guess = [g1_peak_value, g1_guess, g1_std]
-	x_vals = linspace(g1_guess*0.9, g1_guess*1.1, int(len(filt_values)))[:,None]
-	log_dens = kd.score_samples(x_vals)
-	dens = np.exp(log_dens)
-
-	x_range = x_vals[:,0]
-	y_range = dens
-
-	g1_opt, cov = curve_fit(normal_curve, x_range, y_range, start_guess, bounds=([0,g1_guess*0.75,0],[1,g1_guess*1.25,(np.mean(filt_values)-g1_guess)]))
-
-	#Calculate G2
 	g2_peak_value = np.exp(kd.score_samples([[g2_guess]])[0])
-	g2_std = (g2_guess-np.mean(filt_values))/2
-	start_guess = [g2_peak_value, g2_guess, g1_opt[2]]
-	x_vals = linspace(g2_guess*0.9, g2_guess*1.1, int(len(filt_values)))[:,None]
+
+	if not lock_stdev:
+		stdev = 0.05*g1_guess
+
+	start_guess = [g1_peak_value, g2_peak_value, g1_guess, stdev, 0, 0, 0.05, 1.5*g1_guess]
+	#x_vals = linspace(g1_guess*0.9, g1_guess*1.1, int(len(filt_values)))[:,None]
+	x_vals = linspace(g1_guess*0.75, 2*g1_guess*1.25, int(len(filt_values)))[:,None]
 	log_dens = kd.score_samples(x_vals)
 	dens = np.exp(log_dens)
 
 	x_range = x_vals[:,0]
 	y_range = dens
 
-	g2_opt, cov = curve_fit(normal_curve, x_range, y_range, start_guess, bounds=([0,g2_guess*0.75,0],[1,g2_guess*1.25,(g2_guess-np.mean(filt_values))]))
+	if lock_stdev:
+		#g1_opt, cov = curve_fit(all_curves, x_range, y_range, start_guess, bounds=([0,0,g1_guess*0.95,stdev*0.95,-0.1,-50,0,g1_guess],[1,1,g1_guess*1.05,stdev*1.05,0.1,50,1,2*g1_guess]), maxfev=5000)
+		g1_opt, cov = curve_fit(all_curves, x_range, y_range, start_guess, bounds=([0,0,g1_guess*0.95,stdev*0.95,-np.inf,-np.inf,-np.inf,-np.inf],[1,1,g1_guess*1.05,stdev*1.05,np.inf,np.inf,np.inf,np.inf]), maxfev=5000)
 
-	x_vals = linspace(min(raw_values), max(raw_values), int(len(raw_values)))[:,None]
+	else:
+		g1_opt, cov = curve_fit(all_curves, x_range, y_range, start_guess, bounds=([0,0,g1_guess*0.95,0.001*target_range,-0.1,-50,0,g1_guess],[1,1,g1_guess*1.05,0.1*g1_guess,0.1,50,1,2*g1_guess]), maxfev=5000)
 
+	#TODO: adjust number of points taken here
+	x_vals = linspace(min(filt_values), max(filt_values), 500)[:,None]
 	#Integrate to get areas: integrate KDE to normalize, then G1 and G2 to subtract
 	start_x = min(x_vals)
 	end_x = max(x_vals)
 
 	#TODO: see what root problem is
 	KDE_area = quad(lambda x: np.exp(kd.score_samples([[x]])), start_x, end_x)
-	g1_area = quad(normal_curve, start_x, end_x, args=(g1_opt[0],g1_opt[1],g1_opt[2]))
-	g2_area = quad(normal_curve, start_x, end_x, args=(g2_opt[0],g2_opt[1],g2_opt[2]))
+	g1_area = quad(normal_curve, start_x, end_x, args=(g1_opt[0],g1_opt[2],g1_opt[3]))
+	g2_area = quad(normal_curve, start_x, end_x, args=(g1_opt[1],g1_opt[2],g1_opt[3]))
+	#s_area = quad(s_phase, start_x, end_x, args=(g1_opt[2], g1_opt[3],g1_opt[4],g1_opt[5],g1_opt[6]))
 
 	g1_pct = g1_area[0]/KDE_area[0]
 	g2_pct = g2_area[0]/KDE_area[0]
 	s_pct = 1-(g1_area[0] + g2_area[0])/KDE_area[0]
 
 	#Display graph
-	ax.fill(x_vals[:, 0], np.exp(kd.score_samples(x_vals)), fc='#AAAAFF')
-	#ax.fill(x_vals, dens, fc='#123B67')
-	ax.hist(raw_values,int(sqrt(len(raw_values))),density=True,color='#002D5C')
-	ax.plot(x_vals, normal_curve(x_vals, g2_opt[0], g2_opt[1], g2_opt[2]),color='red')
-	ax.fill(x_vals, normal_curve(x_vals, g2_opt[0], g2_opt[1], g2_opt[2]),fc='red',alpha=0.7)
-	ax.plot(x_vals, normal_curve(x_vals, g1_opt[0], g1_opt[1], g1_opt[2]),color='yellow')
-	ax.fill(np.insert(x_vals,0,[0]), np.insert(normal_curve(x_vals, g1_opt[0], g1_opt[1], g1_opt[2]),0,[0]),fc='yellow', alpha=0.7)
+	if output_filename:
+		ax.fill(x_vals[:, 0], np.exp(kd.score_samples(x_vals)), fc='#AAAAFF')
+		#ax.fill(x_vals, dens, fc='#123B67')
+		x_vals = linspace(min(filt_values), max(filt_values), 1000)
+		ax.hist(raw_values,int(sqrt(len(raw_values))),density=True,color='#002D5C')
+		ax.plot(x_vals, normal_curve(x_vals, g1_opt[1], 2*g1_opt[2], g1_opt[3]),color='red')
+		ax.fill(x_vals, normal_curve(x_vals, g1_opt[1], 2*g1_opt[2], g1_opt[3]),fc='red',alpha=0.7)
+		ax.plot(x_vals, s_phase(x_vals, g1_opt[2], g1_opt[3],g1_opt[4],g1_opt[5],g1_opt[6],g1_opt[7]),color='green')
+		ax.fill(x_vals, s_phase(x_vals, g1_opt[2], g1_opt[3],g1_opt[4],g1_opt[5],g1_opt[6],g1_opt[7]),fc='green',alpha=0.7)
+		ax.plot(x_vals, normal_curve(x_vals, g1_opt[0], g1_opt[2], g1_opt[3]),color='yellow')
+		ax.fill(np.insert(x_vals,0,[0]), np.insert(normal_curve(x_vals, g1_opt[0], g1_opt[2], g1_opt[3]),0,[0]),fc='yellow', alpha=0.7)
+
+		f = output_filename
+		savefig(f,bbox_inches='tight')
+		plt.close('all')
 
 	#Readjust for scaling
 	#g1_max_val = len(filt_values)*g1_opt[0]
-	g1_max_val = len(filt_values)*normal_curve(g1_opt[1],g1_opt[0],g1_opt[1],g1_opt[2])
-	g1_peak = low+g1_opt[1]/(target_range/high)
-	g1_opt_std = g1_opt[2]/(target_range/high)
-	#g2_max_val = len(filt_values)*g2_opt[0]
-	g2_max_val = len(filt_values)*normal_curve(g2_opt[1],g2_opt[0],g2_opt[1],g2_opt[2])
-	g2_peak = low+g2_opt[1]/(target_range/high)
-	g2_opt_std = g2_opt[2]/(target_range/high)
+	g1_max_val = len(filt_values)*g1_opt[0]
+	g1_peak = g1_opt[2]/(target_range/high)
+	g1_opt_std = g1_opt[3]/(target_range/high)
+	#g2_max_val = len(filt_values)*g1_opt[0]
+	g2_max_val = len(filt_values)*g1_opt[1]
+	g2_peak = 2*g1_opt[2]/(target_range/high)
 
-	#with open('D:\\Users\\GregoryBreuer\\Desktop\\test.png','w') as f:
-	f = 'D:\\Users\\GregoryBreuer\\Desktop\\test.png'
-	savefig(f,bbox_inches='tight')
-	plt.close('all')
+	x_vals = linspace(min(filt_values), max(filt_values), 500)
+	return_dict = {}
+	return_dict['g1_pct'] = g1_pct
+	return_dict['g2_pct'] = g2_pct
+	return_dict['s_pct'] = s_pct
+	return_dict['fig'] = None
+	return_dict['low_count'] = sub_g1_count
+	return_dict['high_count'] = sup_g2_count
+	return_dict['total_count'] = total_events
+	return_dict['fit_data'] = [x_vals.tolist(), normal_curve(x_vals, g1_opt[1], 2*g1_opt[2], g1_opt[3]).tolist(), normal_curve(x_vals, g1_opt[0], g1_opt[2], g1_opt[3]).tolist(), s_phase(x_vals, g1_opt[2], g1_opt[3],g1_opt[4],g1_opt[5],g1_opt[6],g1_opt[7]).tolist()]
+	return_dict['g1_opt'] = [g1_max_val, g1_peak, g1_opt_std]
+	return_dict['g2_opt'] = [g2_max_val, g2_peak, g1_opt_std]
 
-	#return {'g1_pct': g1_pct,'g2_pct': g2_pct, 's_pct': s_pct, 'fig': fig, 'low_count': sub_g1_count, 'high_count': sup_g2_count,'total_count': total_events,'g1_opt':[g1_max_val, g1_peak, g1_opt_std],'g2_opt':[g2_max_val, g2_peak, g2_opt_std]}
-	return {'g1_pct': g1_pct,'g2_pct': g2_pct, 's_pct': s_pct, 'fig': None, 'low_count': sub_g1_count, 'high_count': sup_g2_count,'total_count': total_events,'g1_opt':[g1_max_val, g1_peak, g1_opt_std],'g2_opt':[g2_max_val, g2_peak, g2_opt_std]}
-
-def run_experimental_nofig_analysis(data, x_min, x_max, g1_guess, g2_guess, target_range=100.):
-	res = run_experimental_analysis(data, x_min, x_max, g1_guess, g2_guess, target_range=100.)
-	del res['fig']
-	return res
+	return return_dict

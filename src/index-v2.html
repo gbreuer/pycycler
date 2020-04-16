@@ -154,6 +154,20 @@
 	<div id="loadingText" class="ui indeterminate text loader">Checking files.</div>
 </div>
 
+<div id="filePickerModal" class="ui modal">
+  <div class="header">Select Example Files</div>
+  <div class="content">
+    <div id="filePickerModalContent" class="ui relaxed four column grid" style="overflow:auto">
+    </div>
+    <p></p>
+    <div class="ui basic right floated segment">
+      <button class='ui button' onclick="removeAllFilesForPreview()">Select None</button>
+      <button class='ui button' onclick="selectAllFilesForPreview()">Select All</button>
+      <button class='ui primary button' onclick="closeFilePickerModal()">Continue</button>
+    </div>
+  </div>
+</div>
+
 <!-- Following Menu -->
 <div class="ui large top fixed menu transition hidden">
   <div class="ui container">
@@ -198,17 +212,17 @@
   </div>
 
   <div id="secondPage" class="ui vertical stripe disabled attached segment">
-    <div class="ui middle aligned stackable grid container">
+    <div class="ui middle aligned stackable divided grid container">
       <div class="row">
         <div class="eight wide column">
           <h3 class="ui header">Analysis Settings</h3>
-		<div id="chartContainer" class="ui basic segment">
-			<canvas id="analysisChart" width="400" height="300"></canvas>
-		</div>
+      		<div id="chartContainer" class="ui basic segment">
+      			<canvas id="analysisChart" width="400" height="300"></canvas>
+      		</div>
           <p></p>
         </div>
         <div class="seven wide right floated column">
-			<div class="ui raised segment">
+			<div class="ui basic segment">
 			<div id="paramDimmer" class="ui dimmer">
 				<div class="content">
 					<h4 id="paramText" class="ui inverted icon header">
@@ -264,7 +278,7 @@
       </div>
       <div class="row">
         <div class="center aligned column">
-          <a class="ui huge button" onclick="start_analysis()">Begin Analysis</a>
+          <a class="ui huge button" onclick="run_first_analysis()">Begin Analysis</a>
         </div>
       </div>
     </div>
@@ -343,8 +357,5 @@
     </div>
   </div>
 </div>
-
-
-
 
 </body></html>

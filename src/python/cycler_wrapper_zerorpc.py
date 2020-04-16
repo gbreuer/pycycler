@@ -3,6 +3,7 @@ from read_fcs import FCSFile
 from histogram_analysis import refined_analysis
 import json
 import pandas as pd
+import zerorpc
 
 def load_all_files(options):
 	stdout = []
@@ -142,18 +143,25 @@ def run_analysis(options):
 	sys.stdout.flush()
 	sys.stderr.flush()
 
+class CyclerServer(object):
+	def run(self, arguments):
+		if sys.argv[1] == 'check_file':
+			check_file(arguments)
+
+		elif sys.argv[1] == 'get_data':
+			get_data(arguments)
+
+		elif sys.argv[1] == 'get_preview':
+			get_data(arguments)
+
+		elif sys.argv[1] == 'run_analysis':
+			run_analysis(arguments)
+
+		elif sys.argv[1] == 'load_all_files':
+			load_all_files(arguments)
+
+
 if __name__ == '__main__':
-	if sys.argv[1] == 'check_file':
-		check_file(sys.argv[2])
-
-	elif sys.argv[1] == 'get_data':
-		get_data(sys.argv)
-
-	elif sys.argv[1] == 'get_preview':
-		get_data(sys.argv)
-
-	elif sys.argv[1] == 'run_analysis':
-		run_analysis(sys.argv)
-
-	elif sys.argv[1] == 'load_all_files':
-		load_all_files(sys.argv)
+	server = zerorpc.Server(CyclerServer())
+	server.bind("tcp://0.0.0.0:4242")
+	server.run()

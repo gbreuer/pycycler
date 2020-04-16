@@ -4,7 +4,7 @@ const {PythonShell} = require('python-shell');
 const exec = require('child_process').execFile;
 const temp = require('temp');
 const fs = require('fs');
-const zerorpc = require("zerorpc");
+//const zerorpc = require("zerorpc");
 
 temp.track()
 
@@ -33,6 +33,20 @@ var analysis_filenames = []
 var analysis_results = []
 var analysis_results_graphdata = {}
 
+$('.tabular menu .item').tab();
+
+function changeTab(tabname){
+	$('#tabMenu').children().each(function(){
+		if ($(this).attr("data-tab") == tabname){
+			$(this).addClass('active');
+		}
+		else {
+			$(this).removeClass('active');
+		}
+	});
+	$.tab('change tab', tabname);
+}
+
 //var client = new zerorpc.Client();
 //setupPythonRPC();
 
@@ -50,8 +64,7 @@ function setupPythonRPC(){
 //Document setup
 function setupDocument(){
 	resetAnalysis();
-	$('#firstPage').height($(window).height())
-	$('#firstPage').css('background-image','url("../res/HeaderImg.png")')
+	//$('#firstPage').height($(window).height()-$('#tabMenu').height()-40)
 }
 
 function resetAnalysis(){
@@ -77,7 +90,7 @@ function resetAnalysis(){
 
 	$('#analysisChart').remove();
 	$('#chartContainer').empty();
-	$('#resultsTableBody').empty();
+	$('#resultsTable').empty();
 }
 
 //LOADING FILES FOR ANALYSIS
@@ -105,15 +118,15 @@ function check_file(filename){
 		loadingScreen(true, "Checking files. "+(totalFiles - fileNames.length)+" file(s) remaining.")
 
 		if (fileNames.length == totalFiles){
-			$('#continueButton').removeClass('disabled');
 			loadingScreen(false)
-			$("#secondPage").get(0).scrollIntoView();
 			$("#secondPage").removeClass('disabled');
 
 			$('#paramDropdownMenu').empty();
 			for (let i=0; i < fileProperties.length; i++){
 				$('#paramDropdownMenu').append("<div class='item' data-value='"+fileProperties[i]+"'>"+fileProperties[i]+"</div>");
 			}
+
+			changeTab('file_select');
 		}
 		else if (filesToCheck.length > 0) {
 			check_file(filesToCheck.pop());
@@ -153,7 +166,7 @@ function load_all_files(){
 						file_data_dict = JSON.parse(data);
 						selectedPreviewFiles = Object.keys(file_data_dict);
 						draw_file_selection();
-						$('#filePickerModal').modal('show');
+						//TODO: go to appropriate tab
 						make_preview();
 					}
 				});
@@ -167,7 +180,16 @@ function draw_file_selection(){
 	for (let i=0; i < Object.keys(file_data_dict).length; i++){
 		let filenameWithExtension = Object.keys(file_data_dict)[i].split('\\').pop().split('/').pop();
 		let trunc_fn = filenameWithExtension.replace(/\./g,'')
-		$("#filePickerModalContent").append("<div class='column'><div class='fluid ui segment button' id='"+trunc_fn+"_button'><a class='ui green right corner label'><i class='check icon'></i></a><canvas height='300px' id='previewChart"+i+"'></canvas><h5>"+filenameWithExtension+"</h5></div></div>");
+		$("#filePickerModalContent").append("\
+		<div class='card' id='"+trunc_fn+"_button'>\
+			<div class='image'>\
+				<canvas height='200px' id='previewChart"+i+"'></canvas>\
+			</div>\
+			<div class='content'>\
+				<a class='ui green right corner label'><i class='check icon'></i></a>\
+				<div class='header'>"+filenameWithExtension+"\
+			</div>\
+		</div>");
 		$("#"+trunc_fn+"_button").click(function(){
 			if ($("#"+trunc_fn+"_button").find('.label').css('visibility') == 'visible'){
 				$("#"+trunc_fn+"_button").find('.label').css('visibility','hidden');
@@ -197,7 +219,8 @@ function removeAllFilesForPreview(){
 }
 
 function closeFilePickerModal(){
-	$("#filePickerModal").modal('hide');
+	changeTab('analysis_settings');
+	//$("#filePickerModal").modal('hide');
 }
 
 function load_analysis(fn){
@@ -326,6 +349,7 @@ function draw_histogram(ctx, data, tooltips_enabled=true){
 
 function start_analysis(){
 	loadingScreen(true, "Waiting for first file to finish analysis.")
+
 	for (let i =0; i < Math.min(fileNames.length, MAX_PROCESSES); i++){
 		run_analysis(fileNames.pop())
 	}
@@ -387,14 +411,21 @@ function run_analysis(fn){
 
 							let trunc_fn = filenameWithExtension.replace(/\./g,'')
 
-							$('#resultsTableBody').append("\
-									<tr>\
-									  <td data-label='Filename'>"+filenameWithExtension+"</td>\
-									  <td data-label='G1/G0 Pct'>"+res['g1_pct'].toFixed(2)+"</td>\
-									  <td data-label='G2/M Pct'>"+res['g2_pct'].toFixed(2)+"</td>\
-									  <td data-label='S Pct'>"+res['s_pct'].toFixed(2)+"</td>\
-									  <td data-label='View'><div id='"+trunc_fn+"' class='ui tiny button'>View</div></td>\
-							</tr>");
+							$('#resultsTable').append("\
+	                <a class='item' id='"+trunc_fn+"'>\
+	                  <div class='content'>\
+	                    <div class='header'>"+filenameWithExtension+"</div>\
+	                    <div class='description'>\
+												<div class='ui center aligned basic segment'>\
+		                      <div class='ui celled horizontal list'>\
+		                        <div class='item'>G0/G1 %:"+res['g1_pct'].toFixed(2)+"</div>\
+		                        <div class='item'>G2/M %:"+res['g2_pct'].toFixed(2)+"</div>\
+		                        <div class='item'>S %:"+res['s_pct'].toFixed(2)+"</div>\
+		                      </div>\
+												</div>\
+	                    </div>\
+	                  </div>\
+	                </a>");
 
 							$('#'+trunc_fn).click(function(){
 								load_analysis(results[0]);

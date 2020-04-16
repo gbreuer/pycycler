@@ -11,10 +11,15 @@
   "author": "Gregory Breuer",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^7.1.8"
+    "electron-rebuild": "^1.10.0"
   },
   "dependencies": {
     "chart.js": "^2.9.3",
-    "python-shell": "^1.0.8"
+    "electron": "^8.0.2",
+    "mqnode": "^1.0.0",
+    "python-shell": "^1.0.8",
+    "temp": "^0.9.1",
+    "zeromq": "^6.0.0-beta.6",
+    "zerorpc": "^0.9.8"
   }
 }

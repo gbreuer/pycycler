@@ -3,7 +3,7 @@
 block_cipher = None
 
 
-a = Analysis(['cycler_wrapper.py'],
+a = Analysis(['cycler_wrapper_zerorpc.py'],
              pathex=['D:\\Box Sync\\Documents\\SoftwareProjects\\CellCycleCounter_Electron\\cycler_venv\\Lib\\site-packages\\sklearn\\.libs',
              'D:\\Box Sync\\Documents\\SoftwareProjects\\CellCycleCounter_Electron\\gui\\src\\python',
              'D:\\SyncDocuments\\SoftwareProjects\\CellCycleCounter_Electron\\cycler_venv\\Lib\\site-packages\\sklearn\\.libs',
@@ -25,7 +25,7 @@ exe = EXE(pyz,
           a.scripts,
           [],
           exclude_binaries=True,
-          name='cycler_wrapper',
+          name='cycler_wrapper_zerorpc',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
@@ -38,4 +38,4 @@ coll = COLLECT(exe,
                strip=False,
                upx=True,
                upx_exclude=[],
-               name='cycler_wrapper')
+               name='cycler_wrapper_zerorpc')
