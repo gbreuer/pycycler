@@ -1,7 +1,6 @@
 const {dialog} = require('electron').remote;
 const Chart = require('chart.js');
 const {PythonShell} = require('python-shell');
-const exec = require('child_process').execFile;
 const temp = require('temp');
 const fs = require('fs');
 const zmq = require("zeromq");

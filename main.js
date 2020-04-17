@@ -1,10 +1,11 @@
 // Modules to control application life and create native browser window
 const {app, BrowserWindow} = require('electron')
-const path = require('path')
+const path = require('path');
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let mainWindow
+let backendServer
 
 function createWindow () {
   // Create the browser window.
@@ -33,10 +34,41 @@ function createWindow () {
   })
 }
 
+//Initialize python server to handle queries in background
+const createServer = () => {
+  let executable = ""
+
+  switch (process.platform){
+    case 'linux':
+      executable = './dist/cycler_wrapper_zeromq';
+      break;
+
+    case 'win32':
+      executable = './dist/cycler_wrapper.zeromq.exe'
+      break;
+  }
+
+  let backendServer = require('child_process').spawn(executable)
+  if (backendServer != null){
+    console.log("Server started.");
+  }
+  else{
+    console.log("ERROR: Cannot start backend server at "+executable)
+  }
+}
+
+const killServer = () => {
+  backendServer.kill();
+  backendServer = null;
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', createWindow)
+app.on('ready', createServer)
+
+app.on('will-quit', killServer);
 
 // Quit when all windows are closed.
 app.on('window-all-closed', function () {
