@@ -5,6 +5,8 @@ import json
 import pandas as pd
 import zmq
 import time
+from threading import Thread
+from queue import Queue
 
 def load_all_files(options):
 	stdout = []
@@ -17,17 +19,20 @@ def load_all_files(options):
 	data_dict = {}
 
 	for filename in filenames:
-		if (filename[-3:] == 'fcs'):
-			file = FCSFile()
+		try:
+			if (filename[-3:] == 'fcs'):
+				file = FCSFile()
 
-			file.load_file(filename)
-			file_data = file.get_data_by_name(property_name)
+				file.load_file(filename)
+				file_data = file.get_data_by_name(property_name)
 
-		elif (filename[-3:] == 'csv'):
-			df = pd.read_csv(filename)
-			file_data = list(df[property_name])
+			elif (filename[-3:] == 'csv'):
+				df = pd.read_csv(filename)
+				file_data = list(df[property_name])
 
-		data_dict[filename] = file_data
+			data_dict[filename] = file_data
+		except:
+			print("Loading "+property_name+" from "+filename+" failed. Check if property exists.")
 
 	#return dict and average dict
 	with open(output_filename, 'w') as f:
@@ -127,42 +132,69 @@ def run_analysis(options):
 	stdout.append(filename)
 	if (len(options) == 11):
 		analysis_std = float(options[10])
-		stdout.append(refined_analysis(file_data, low_lim, high_lim, g1_guess, g2_guess, stdev=analysis_std, output_filename=img_filename))
+		stdout.append(refined_analysis(file_data, low_lim, high_lim, g1_guess, g2_guess, stdev=analysis_std))
 	else:
-		stdout.append(refined_analysis(file_data, low_lim, high_lim, g1_guess, g2_guess, output_filename=img_filename))
+		stdout.append(refined_analysis(file_data, low_lim, high_lim, g1_guess, g2_guess))
 
 	return stdout
 
-if __name__ == '__main__':
-	context = zmq.Context()
-	socket = context.socket(zmq.REP)
-	socket.bind("tcp://127.0.0.1:4242")
+def process_request(in_q, out_q):
+	print("Worker started.")
 
 	while True:
-		message = socket.recv()
-		message = json.loads(message)
-		print(message)
-		ret = json.dumps(["OK","Ready"])
+		message = in_q.get()
+		method = message[0]
+		args = ['']+message
 
-		if message:
-			method = message[0]
-			args = ['']+message
+		ret = json.dumps(['OK'])
 
-			if method == 'check_file':
-				ret = json.dumps(['check_file',check_file(args)])
+		if method == 'check_file':
+			ret = json.dumps(['check_file',check_file(args)])
 
-			elif method == 'get_data':
-				ret = json.dumps(['get_data',get_data(args)])
+		elif method == 'get_data':
+			ret = json.dumps(['get_data',get_data(args)])
 
-			elif method == 'get_preview':
-				ret = json.dumps(['get_preview',get_data(args)])
+		elif method == 'get_preview':
+			ret = json.dumps(['get_preview',get_data(args)])
 
-			elif method == 'run_analysis':
-				ret = json.dumps(['run_analysis',run_analysis(args)])
+		elif method == 'run_analysis':
+			ret = json.dumps(['run_analysis',run_analysis(args)])
 
-			elif method == 'load_all_files':
-				ret = json.dumps(['load_all_files',load_all_files(args)])
+		elif method == 'load_all_files':
+			ret = json.dumps(['load_all_files',load_all_files(args)])
 
-		socket.send_string(ret)
+		out_q.put(ret)
 
-		time.sleep(0.5)
+		in_q.task_done()
+
+if __name__ == '__main__':
+	context = zmq.Context()
+	socket = context.socket(zmq.PAIR)
+	socket.bind("tcp://127.0.0.1:4242")
+
+	in_q = Queue()
+	out_q = Queue()
+
+	for i in range(6):
+		worker = Thread(target=process_request, args=(in_q,out_q,))
+		worker.setDaemon(True)
+		worker.start()
+
+	while True:
+		try:
+			message = socket.recv(zmq.NOBLOCK)
+			message = json.loads(message)
+
+			if message:
+				in_q.put(message)
+
+		except:
+			pass
+
+		while not out_q.empty():
+			response = out_q.get()
+			print(response)
+			socket.send_string(response)
+			out_q.task_done()
+
+		time.sleep(0.1)

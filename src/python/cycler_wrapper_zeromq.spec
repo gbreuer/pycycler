@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['cycler_wrapper_zeromq.py'],
-             pathex=['/home/gregorybreuer/cycler/src/python'],
+             pathex=[],
              binaries=[],
              datas=[],
              hiddenimports=['pkg_resources.py2_warn','sklearn.neighbors._typedefs','sklearn.utils._cython_blas'],

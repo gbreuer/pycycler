@@ -10,7 +10,7 @@ let backendServer
 function createWindow () {
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 1400,
+    width: 1200,
     height: 900,
     webPreferences: {
       nodeIntegration: true
@@ -37,17 +37,19 @@ function createWindow () {
 //Initialize python server to handle queries in background
 const createServer = () => {
   let executable = ""
+  console.log(process.cwd())
 
   switch (process.platform){
     case 'linux':
-      executable = './dist/cycler_wrapper_zeromq';
+      executable = path.join(__dirname,'dist/cycler_wrapper_zeromq');
       break;
 
     case 'win32':
-      executable = './dist/cycler_wrapper.zeromq.exe'
+      executable = path.join(__dirname,'dist\\cycler_wrapper_zeromq.exe');
       break;
   }
 
+  console.log(executable);
   let backendServer = require('child_process').spawn(executable)
   if (backendServer != null){
     console.log("Server started.");

@@ -9,7 +9,7 @@
 	<meta http-equiv="X-Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com/ 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://code.jquery.com/; font-src 'self' https://fonts.gstatic.com/ data: ; img-src 'self' data:">
 
   <!-- Site Properties -->
-  <title>Homepage - Semantic</title>
+  <title>Cycler - An Open Source High-Throughput Cell-Cycle Analysis Application</title>
 		<script src="./jquery/jquery-3.4.1.min.js" type="text/javascript"></script>
 		<script type="text/javascript">
 			try {
@@ -20,7 +20,6 @@
 		<script src="./semantic/semantic.min.js" type="text/javascript"></script>
 		<link rel="stylesheet" href="./chartist/chartist.css">
 		<script src="./chartist/chartist.js"></script>
-		<script src="./others/tablesort.js"></script>
 		<script src="./index.js" type="text/javascript"></script>
 
   <style type="text/css">
@@ -61,8 +60,9 @@
     <div class="item" data-tab="file_select">Select Files</div>
     <div class="item" data-tab="analysis_settings">Settings</div>
     <div class="item" data-tab="results">Results</div>
+    <div class="item" data-tab="about">About</div>
   </div>
-  <div id="firstPage" class="ui active bottom attached tab segment" data-tab="welcome">
+  <div id="firstPage" class="ui active bottom attached transition fade in tab segment" data-tab="welcome">
     <div class="ui basic segment">
       <div class="ui centered grid">
         <div class="row">
@@ -82,7 +82,7 @@
     </div>
   </div>
 
-  <div class="ui bottom attached tab segment" data-tab="file_select">
+  <div class="ui bottom attached transition fade in tab segment" data-tab="file_select">
     <div id="filePickerModal" class="ui basic segment">
       <div class="ui centered grid">
         <div class="row">
@@ -118,7 +118,7 @@
     </div>
   </div>
 
-  <div class="ui bottom attached tab segment" data-tab="analysis_settings">
+  <div class="ui bottom attached transition fade in tab segment" data-tab="analysis_settings">
     <div id="secondPage" class="ui basic segment">
       <div class="ui centered grid">
         <div class="row">
@@ -126,56 +126,56 @@
         </div>
         <div class="row">
           <div class="eight wide column">
-            <div class="ui right very close tiny rail">
-              <div class="ui basic segment">
-                <div id="paramDimmer" class="ui dimmer">
-                  <div class="content">
-                    <h4 id="paramText" class="ui inverted icon header">
-                      <i class="arrow left icon"></i>
-                      Click chart to select value.
-                    </h4>
-                  </div>
-                </div>
-                <h4>Analysis Settings</h4>
-                <div id="selectedParamSegment" onclick="changeFileProperty(chosenProperty)" class="ui disabled segment">
-                  <h5>Selected Parameters</h5>
-                  <div class="ui divided list">
-                    <a class="item">
-                      <i class="right triangle icon"></i>
-                      <div class="content">
-                        <div class="header">G1/G0 Estimate</div>
-                        <div id="g1_text" class="description">?</div>
-                      </div>
-                    </a>
-                    <a class="item">
-                      <i class="right triangle icon"></i>
-                      <div class="content">
-                        <div class="header">G2/M Estimate</div>
-                        <div id="g2_text" class="description">?</div>
-                      </div>
-                    </a>
-                    <a class="item">
-                      <i class="right triangle icon"></i>
-                      <div class="content">
-                        <div class="header">Low Cutoff</div>
-                        <div id="low_text" class="description">?</div>
-                      </div>
-                    </a>
-                    <a class="item">
-                      <i class="right triangle icon"></i>
-                      <div class="content">
-                        <div class="header">High Cutoff</div>
-                        <div id="high_text" class="description">?</div>
-                      </div>
-                    </a>
-                  </div>
-                  <h5>Click to reselect parameters.</h5>
-                </div>
-              </div>
-            </div>
         		<div id="chartContainer" class="ui basic segment" style="max-width:600px; max-height:500px">
         			<canvas id="analysisChart" width="400" height="300"></canvas>
         		</div>
+          </div>
+          <div class="four wide column">
+            <div class="ui basic segment">
+              <div id="paramDimmer" class="ui dimmer">
+                <div class="content">
+                  <h4 id="paramText" class="ui inverted icon header">
+                    <i class="arrow left icon"></i>
+                    Click chart to select value.
+                  </h4>
+                </div>
+              </div>
+              <h4>Analysis Settings</h4>
+              <div id="selectedParamSegment" onclick="changeFileProperty(chosenProperty)" class="ui disabled segment">
+                <h5>Selected Parameters</h5>
+                <div class="ui divided list">
+                  <a class="item">
+                    <i class="right triangle icon"></i>
+                    <div class="content">
+                      <div class="header">G1/G0 Estimate</div>
+                      <div id="g1_text" class="description">?</div>
+                    </div>
+                  </a>
+                  <a class="item">
+                    <i class="right triangle icon"></i>
+                    <div class="content">
+                      <div class="header">G2/M Estimate</div>
+                      <div id="g2_text" class="description">?</div>
+                    </div>
+                  </a>
+                  <a class="item">
+                    <i class="right triangle icon"></i>
+                    <div class="content">
+                      <div class="header">Low Cutoff</div>
+                      <div id="low_text" class="description">?</div>
+                    </div>
+                  </a>
+                  <a class="item">
+                    <i class="right triangle icon"></i>
+                    <div class="content">
+                      <div class="header">High Cutoff</div>
+                      <div id="high_text" class="description">?</div>
+                    </div>
+                  </a>
+                </div>
+                <h5>Click to reselect parameters.</h5>
+              </div>
+            </div>
           </div>
         </div>
         <div class="row">
@@ -188,7 +188,7 @@
   </div>
 
 <!-- Analysis Results -->
-  <div class="ui bottom attached tab segment" data-tab="results">
+  <div class="ui bottom attached transition fade in tab segment" data-tab="results">
     <div id="thirdPage" class="ui basic segment">
       <div class="ui centered grid">
         <div class="row">
@@ -232,6 +232,32 @@
                 </a>
               </div>
         		</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="center aligned column">
+            <a class="ui huge primary button" onclick="download_csv()">Export to .CSV</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- About section -->
+  <div class="ui bottom attached transition fade in tab segment" data-tab="about">
+    <div id="thirdPage" class="ui basic segment">
+      <div class="ui centered grid">
+        <div class="row">
+          <div class="fluid column">
+            <h1>About Cycler</h1>
+          </div>
+        </div>
+        <div class="row">
+          <div class="fourteen wide column" style="text-align:justify">
+            Cycler was designed for the purpose of making cell-cycle analysis fast and efficient across many experiments conducted at the same time.
+            As such, it relies on consistent data.
+            <p><p>
+            Feel free to drop by our <a href="https://github.com/gbreuer/cycler">Github Repository</a> to report any issues or view the source code.
           </div>
         </div>
         <div class="row">

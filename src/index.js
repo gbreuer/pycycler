@@ -35,6 +35,13 @@ var analysis_results_graphdata = {}
 
 $('.tabular menu .item').tab();
 
+var shell = require('electron').shell;
+//open links externally by default
+$(document).on('click', 'a[href^="http"]', function(event) {
+		event.preventDefault();
+		shell.openExternal(this.href);
+});
+
 function changeTab(tabname){
 	$('#tabMenu').children().each(function(){
 		if ($(this).attr("data-tab") == tabname){
@@ -47,16 +54,16 @@ function changeTab(tabname){
 	$.tab('change tab', tabname);
 }
 
-var pubber = zmq.socket("req");
+var socket = zmq.socket("pair");
 
 setupZeroMQ();
 
 function zmq_broker(message){
+	// try{
 	results = JSON.parse(message);
 
 	switch (results[0]){
 		case 'check_file':
-			console.log("checked");
 			check_file_handler(results[1]);
 			break;
 
@@ -75,14 +82,18 @@ function zmq_broker(message){
 
 		default:
 			console.log(message.toString())
-	}
+		}
+// 	}
+// 	catch {
+// 		console.log("Message not understood.");
+// 	}
 }
 
 function setupZeroMQ(){
-	pubber.connect("tcp://127.0.0.1:4242");
-	console.log("Pubber connected on port 4242");
-	pubber.send(JSON.stringify(['ready','willing']));
-	pubber.on("message", zmq_broker);
+	socket.connect("tcp://127.0.0.1:4242");
+	console.log("socket connected on port 4242");
+	socket.on("message", zmq_broker);
+	socket.send(JSON.stringify(['ready','willing']));
 }
 
 
@@ -124,7 +135,7 @@ function check_file(filename){
 
 	args.push()
 
-	pubber.send(JSON.stringify(args));
+	socket.send(JSON.stringify(args));
 }
 
 function check_file_handler(results){
@@ -182,7 +193,7 @@ function load_all_files(){
 				args.push(fileNames[i])
 			}
 
-			pubber.send(JSON.stringify(args));
+			socket.send(JSON.stringify(args));
 		}
 	});
 }
@@ -262,19 +273,21 @@ function load_analysis_to_dict(fn){
 
 function make_preview(){
 	let filenames = Object.keys(file_data_dict);
-	let min_length = Math.floor(15000/filenames.length);
+	let min_length = Math.floor(15000/selectedPreviewFiles.length);
 	for (let i=0; i < filenames.length; i++){
 		if (selectedPreviewFiles.indexOf(filenames[i]) != -1){
 			min_length = Math.min(file_data_dict[filenames[i]].length,min_length);
 		}
 	}
 
+	console.log(min_length);
+
 	preview_data = []
 	for (let i=0; i < filenames.length; i++){
 
 		if (selectedPreviewFiles.indexOf(filenames[i]) != -1){
 			for (let j=0; j < min_length; j++){
-					preview_data.push(file_data_dict[filenames[i]][Math.floor(Math.random()*min_length)]);
+					preview_data.push(file_data_dict[filenames[i]][Math.floor(Math.random()*file_data_dict[filenames[i]].length)]);
 			}
 		}
 	}
@@ -389,7 +402,7 @@ function run_first_analysis(){
 					temp.open({suffix:'.png'}, function(err2,info2) {
 						let args = ["run_analysis", chosenProperty, g1_guess, g2_guess, low_cutoff, high_cutoff, 'preview', info.path, info2.path]
 
-						pubber.send(JSON.stringify(args));
+						socket.send(JSON.stringify(args));
 					});
 				}
 			});
@@ -419,7 +432,7 @@ function run_analysis(fn){
 							args.push(analysis_std)
 						}
 
-						pubber.send(JSON.stringify(args));
+						socket.send(JSON.stringify(args));
 					});
 				}
 			});
@@ -440,7 +453,7 @@ function run_analysis_handler(results){
 		$('#resultsTable').append("\
         <a class='item' id='"+trunc_fn+"'>\
           <div class='content'>\
-            <h3 class='header'>"+filenameWithExtension+"</h3>\
+            <h5 class='header'>"+filenameWithExtension+"</h5>\
             <div class='description'>\
 							<div class='ui center aligned basic segment'>\
                 <div class='ui horizontal list'>\
@@ -459,7 +472,6 @@ function run_analysis_handler(results){
 
 		load_analysis_to_dict(results[0])
 
-		$('#resultsTable').tablesort();
 		loadingScreen(false);
 
 		if (fileNames.length > 0){
