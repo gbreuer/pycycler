@@ -14,7 +14,7 @@ The structure of this application is based heavily on the sample Electron.js app
 
 ## To Use
 
-Operation of the Electron.js UI requires proper function of the Python back-end. For distribution purposes, these are typically compiled using PyInstaller for the appropriate platform.
+Operation of the Electron.js UI requires proper function of the Python back-end. For distribution purposes, these are typically compiled using PyInstaller for the appropriate platform and placing the resulting executable inside the `dist` folder in the root directory of the application.
 
 ## License
 
