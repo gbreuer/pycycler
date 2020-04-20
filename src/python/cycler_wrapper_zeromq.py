@@ -7,6 +7,8 @@ from multiprocessing import Process
 import zmq
 
 NUM_WORKERS = 6
+EXIT_COMMAND = 'KILL'
+ALIVE_SIGNAL = json.dumps(['test'])
 
 def load_all_files(options):
 	stdout = []
@@ -150,7 +152,7 @@ def run_analysis(options):
 def process_request(in_q, out_q):
 	print("Worker started.")
 
-	while True:
+	while in_q:
 		message = in_q.get()
 		method = message[0]
 		args = ['']+message
@@ -174,10 +176,12 @@ def process_request(in_q, out_q):
 
 		out_q.put(ret)
 
-def read_kbd_input(inputQueue):
-    while (True):
-        input_str = input()
-        inputQueue.put(input_str)
+def clear_queue(queue):
+	while not queue.empty():
+		try:
+			queue.get_nowait()
+		except:
+			continue
 
 if __name__ == '__main__':
 	multiprocessing.freeze_support()
@@ -191,11 +195,7 @@ if __name__ == '__main__':
 	print("Connected. Starting worker processes...")
 	socket.send_string(json.dumps(['OK']))
 
-	EXIT_COMMAND = 'KILL'
-	inputQueue = queue.Queue()
-
-	#inputThread = threading.Thread(target=read_kbd_input, args=(inputQueue,), daemon=True)
-	#inputThread.start()
+	exit_signal = False
 
 	#Use processes for heavy computation
 	in_q = multiprocessing.Queue()
@@ -206,10 +206,13 @@ if __name__ == '__main__':
 		worker.daemon = True
 		worker.start()
 
+	timeout_timer = time.time()
 	while True:
 		#Prevents ZMQError when no messages have arrived.
 		try:
 			message = socket.recv(zmq.NOBLOCK)
+			timeout_timer = time.time()
+
 			message = json.loads(message)
 
 			print(message)
@@ -222,12 +225,32 @@ if __name__ == '__main__':
 
 		while not out_q.empty():
 			response = out_q.get()
-			socket.send_string(response)
+			try:
+				socket.send_string(response, flags=zmq.NOBLOCK)
+			except:
+				out_q.put_nowait(response)
 
-		if not inputQueue.empty():
-			input_str = inputQueue.get()
-			if EXIT_COMMAND in input_str:
-				inputQueue.close()
-				break
+		#Check if parent process terminated
+		if time.time()-timeout_timer > 5.0:
+			print("No response from application...")
+			try:
+				socket.send_string(ALIVE_SIGNAL, flags=zmq.NOBLOCK)
+			except:
+				out_q.put_nowait(ALIVE_SIGNAL)
+
+		if time.time() - timeout_timer > 6.0:
+			exit_signal = True
+
+		if exit_signal:
+			print("Exiting due to no response from application.")
+			clear_queue(in_q)
+			clear_queue(out_q)
+
+			in_q.close()
+			out_q.close()
+
+			in_q = None
+			out_q = None
+			break
 
 		time.sleep(0.1)

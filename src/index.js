@@ -69,6 +69,10 @@ function zmq_broker(message){
 			loadingScreen(false);
 			break;
 
+		case 'test':
+			socket.send('OK');
+			break;
+
 		case 'check_file':
 			check_file_handler(results[1]);
 			break;

@@ -67,12 +67,6 @@ const createServer = () => {
   }
 }
 
-const killServer = () => {
-  console.log('Killing server.');
-  //This is required to kill child process started by PyInstaller .exe
-  backendServer.stdin.write('KILL\n');
-}
-
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
