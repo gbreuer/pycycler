@@ -27,6 +27,7 @@
     "mqnode": "^1.0.0",
     "python-shell": "^1.0.8",
     "temp": "^0.9.1",
+    "tree-kill": "^1.2.2",
     "zeromq": "^5.2.0"
   },
   "config": {

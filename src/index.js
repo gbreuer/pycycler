@@ -4,11 +4,9 @@ const {PythonShell} = require('python-shell');
 const temp = require('temp');
 const fs = require('fs');
 const zmq = require("zeromq");
-//const zerorpc = require("zerorpc");
 
 temp.track()
 
-var MAX_PROCESSES = 6
 var GRAPH_COLORS = ['rgba(126,83,255,0.2)','rgba(212,83,255,0.2)','rgba(83,172,255,0.2)']
 var active_processes = 0
 
@@ -33,7 +31,14 @@ var analysis_filenames = []
 var analysis_results = []
 var analysis_results_graphdata = {}
 
-$('.tabular menu .item').tab();
+var socket = zmq.socket("pair");
+
+$(document).ready(() => {
+	loadingScreen(true, "Setting up analysis pipeline...");
+	$('.tabular menu .item').tab();
+
+	setupZeroMQ();
+})
 
 var shell = require('electron').shell;
 //open links externally by default
@@ -54,15 +59,16 @@ function changeTab(tabname){
 	$.tab('change tab', tabname);
 }
 
-var socket = zmq.socket("pair");
-
-setupZeroMQ();
-
 function zmq_broker(message){
 	// try{
 	results = JSON.parse(message);
+	console.log(results);
 
 	switch (results[0]){
+		case 'OK':
+			loadingScreen(false);
+			break;
+
 		case 'check_file':
 			check_file_handler(results[1]);
 			break;
@@ -93,14 +99,13 @@ function setupZeroMQ(){
 	socket.connect("tcp://127.0.0.1:4242");
 	console.log("socket connected on port 4242");
 	socket.on("message", zmq_broker);
-	socket.send(JSON.stringify(['ready','willing']));
+	socket.send(JSON.stringify(['ready']));
 }
 
 
 //Document setup
 function setupDocument(){
 	resetAnalysis();
-	//$('#firstPage').height($(window).height()-$('#tabMenu').height()-40)
 }
 
 function resetAnalysis(){
@@ -176,7 +181,7 @@ function load_files(){
 		filesToCheck = result.filePaths;
 		totalFiles = result.filePaths.length;
 		loadingScreen(true, "Checking files. "+filesToCheck.length+" file(s) remaining.");
-		for (i=0; i < Math.min(filesToCheck.length,MAX_PROCESSES); i++){
+		for (i=0; i < filesToCheck.length; i++){
 			check_file(filesToCheck.pop());
 		}
 	}
@@ -386,7 +391,7 @@ function draw_histogram(ctx, data, tooltips_enabled=true){
 function start_analysis(){
 	loadingScreen(true, "Waiting for first file to finish analysis.");
 
-	for (let i =0; i < Math.min(fileNames.length, MAX_PROCESSES); i++){
+	for (let i =0; i < fileNames.length; i++){
 		run_analysis(fileNames.pop())
 	}
 }
@@ -420,23 +425,14 @@ function run_first_analysis_handler(results){
 }
 
 function run_analysis(fn){
-	let tempdatafile = "tdf"
-	temp.open(tempdatafile, function(err, info) {
-		if (!err) {
-			fs.writeFile(info.path, JSON.stringify(file_data_dict[fn]), function(err){
-				if (!err){
-					temp.open({suffix:'.png'}, function(err2,info2){
-						let args = ["run_analysis", chosenProperty, g1_guess, g2_guess, low_cutoff, high_cutoff, fn, info.path, info2.path]
+	temp.open({suffix:'.png'}, function(err2,info2){
+		let args = ["run_analysis", chosenProperty, g1_guess, g2_guess, low_cutoff, high_cutoff, fn, "", info2.path]
 
-						if (analysis_std != null) {
-							args.push(analysis_std)
-						}
-
-						socket.send(JSON.stringify(args));
-					});
-				}
-			});
+		if (analysis_std != null) {
+			args.push(analysis_std)
 		}
+
+		socket.send(JSON.stringify(args));
 	});
 }
 
@@ -502,7 +498,6 @@ function download_csv(){
 	link.setAttribute("href", encodedUri);
 	link.setAttribute("download", "my_data.csv");
 	document.body.appendChild(link);
-
 	link.click();
 }
 
@@ -513,7 +508,7 @@ function loadingScreen(enabled, message){
 	else if (!enabled){
 		$("#loadingModal").modal('hide');
 	}
-	$("#loadingText").text(message)
+	$("#loadingText").html(message)
 }
 
 function paramDimmer(enabled, parameter){

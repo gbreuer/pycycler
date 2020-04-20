@@ -44,6 +44,8 @@
 
     $('.tab.segment').css('min-height',$(window).height()-$('#tabMenu').height()-28)
     $('.tab.segment').css('max-height',$(window).height()-$('#tabMenu').height()-28)
+
+    $('#serverSetupModal').modal('show');
   });
   ;
   </script>
@@ -52,11 +54,10 @@
 <div id="loadingModal" class="ui basic modal">
 	<div id="loadingText" class="ui indeterminate text loader">Checking files.</div>
 </div>
-
 <!-- Page Contents -->
 <div class="pusher">
   <div id="tabMenu" class="ui top attached secondary pointing menu">
-    <div class="active item" data-tab="welcome">Load</div>
+    <div class="active item" data-tab="welcome">Start</div>
     <div class="item" data-tab="file_select">Select Files</div>
     <div class="item" data-tab="analysis_settings">Settings</div>
     <div class="item" data-tab="results">Results</div>
@@ -258,11 +259,6 @@
             As such, it relies on consistent data.
             <p><p>
             Feel free to drop by our <a href="https://github.com/gbreuer/cycler">Github Repository</a> to report any issues or view the source code.
-          </div>
-        </div>
-        <div class="row">
-          <div class="center aligned column">
-            <a class="ui huge primary button" onclick="download_csv()">Export to .CSV</a>
           </div>
         </div>
       </div>

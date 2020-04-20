@@ -1,6 +1,7 @@
 // Modules to control application life and create native browser window
 const {app, BrowserWindow} = require('electron')
 const path = require('path');
+const { spawn } = require('child_process');
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -50,9 +51,16 @@ const createServer = () => {
   }
 
   console.log(executable);
-  let backendServer = require('child_process').spawn(executable)
+  backendServer = spawn(executable);
+
   if (backendServer != null){
-    console.log("Server started.");
+    console.log("Server started: "+backendServer.pid.toString());
+    backendServer.stdout.on('data', function(data){
+      console.log("SERVER_MSG: "+data.toString());
+    });
+    backendServer.stderr.on('data', function (data) {
+      console.log("SERVER_MSG: "+data.toString());
+    });
   }
   else{
     console.log("ERROR: Cannot start backend server at "+executable)
@@ -60,8 +68,9 @@ const createServer = () => {
 }
 
 const killServer = () => {
-  backendServer.kill();
-  backendServer = null;
+  console.log('Killing server.');
+  //This is required to kill child process started by PyInstaller .exe
+  backendServer.stdin.write('KILL\n');
 }
 
 // This method will be called when Electron has finished
@@ -70,7 +79,7 @@ const killServer = () => {
 app.on('ready', createWindow)
 app.on('ready', createServer)
 
-app.on('will-quit', killServer);
+app.on('before-quit', killServer);
 
 // Quit when all windows are closed.
 app.on('window-all-closed', function () {

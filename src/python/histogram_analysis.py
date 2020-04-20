@@ -4,7 +4,6 @@
 # v0.11 - Fixed to auto-scale to mean value of 50 to make sure curve_fitting parameters are optimized appropriately
 
 #TODO: Delete matplotlib
-
 import numpy as np
 from numpy import mean, size, zeros, where, transpose
 from scipy import linspace, signal, arange
@@ -65,6 +64,9 @@ def refined_analysis(data, x_min, x_max, g1_guess, g2_guess, stdev=-1, target_ra
 	filt_values = raw_values[raw_values>x_min]
 	filt_values = filt_values[filt_values<x_max]
 
+	#select random 5000 values to keep calculation time lower
+	filt_values = np.random.choice(filt_values,5000)
+
 	#TODO: check math
 	high = np.max(filt_values)
 	filt_values *= target_range/high
@@ -107,10 +109,10 @@ def refined_analysis(data, x_min, x_max, g1_guess, g2_guess, stdev=-1, target_ra
 
 	if lock_stdev:
 		#g1_opt, cov = curve_fit(all_curves, x_range, y_range, start_guess, bounds=([0,0,g1_guess*0.95,stdev*0.95,-0.1,-50,0,g1_guess],[1,1,g1_guess*1.05,stdev*1.05,0.1,50,1,2*g1_guess]), maxfev=5000)
-		g1_opt, cov = curve_fit(all_curves, x_range, y_range, start_guess, bounds=([0,0,g1_guess*0.95,stdev*0.95,-np.inf,-np.inf,-np.inf,-np.inf],[1,1,g1_guess*1.05,stdev*1.05,np.inf,np.inf,np.inf,np.inf]), maxfev=5000)
+		g1_opt, cov = curve_fit(all_curves, x_range, y_range, start_guess, bounds=([0,0,g1_guess*0.95,stdev*0.95,-np.inf,-np.inf,-np.inf,-np.inf],[1,1,g1_guess*1.05,stdev*1.05,np.inf,np.inf,np.inf,np.inf]), maxfev=250)
 
 	else:
-		g1_opt, cov = curve_fit(all_curves, x_range, y_range, start_guess, bounds=([0,0,g1_guess*0.95,0.001*target_range,-0.1,-50,0,g1_guess],[1,1,g1_guess*1.05,0.1*g1_guess,0.1,50,1,2*g1_guess]), maxfev=5000)
+		g1_opt, cov = curve_fit(all_curves, x_range, y_range, start_guess, bounds=([0,0,g1_guess*0.95,0.001*target_range,-0.1,-50,0,g1_guess],[1,1,g1_guess*1.05,0.1*g1_guess,0.1,50,1,2*g1_guess]), maxfev=250)
 
 	#TODO: adjust number of points taken here
 	x_vals = linspace(min(filt_values), max(filt_values), 500)[:,None]
