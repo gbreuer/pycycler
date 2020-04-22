@@ -2,7 +2,6 @@ const {dialog} = require('electron').remote;
 const ipc = require('electron').ipcRenderer;
 const Chart = require('chart.js');
 const chartjs_annotation = require('chartjs-plugin-annotation');
-const {PythonShell} = require('python-shell');
 const temp = require('temp');
 const fs = require('fs');
 const zmq = require("zeromq");
@@ -66,6 +65,7 @@ function setupZeroMQ(){
 	socket.send(JSON.stringify(['ready']));
 }
 
+//Parse messages sent from python to zeroMQ
 function zmq_broker(message){
 	results = JSON.parse(message);
 	console.log(results);
@@ -364,6 +364,8 @@ function changeFileProperty(val){
 	}
 }
 
+//Generates lines/boxes to overlay on top of analysis to show sites picked for
+//initial curve fitting estimates.
 function get_annotations(){
 	let annotation_array = []
 
@@ -419,6 +421,7 @@ function get_annotations(){
 
 	return annotation_array;
 }
+
 
 function draw_histogram(ctx, data, tooltips_enabled=true){
 	let hist_data = hist(data, -1);
