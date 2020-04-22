@@ -1,5 +1,7 @@
 const {dialog} = require('electron').remote;
+const ipc = require('electron').ipcRenderer;
 const Chart = require('chart.js');
+const chartjs_annotation = require('chartjs-plugin-annotation');
 const {PythonShell} = require('python-shell');
 const temp = require('temp');
 const fs = require('fs');
@@ -33,13 +35,6 @@ var analysis_results_graphdata = {}
 
 var socket = zmq.socket("pair");
 
-$(document).ready(() => {
-	loadingScreen(true, "Setting up analysis pipeline...");
-	$('.tabular menu .item').tab();
-
-	setupZeroMQ();
-})
-
 var shell = require('electron').shell;
 //open links externally by default
 $(document).on('click', 'a[href^="http"]', function(event) {
@@ -47,20 +42,31 @@ $(document).on('click', 'a[href^="http"]', function(event) {
 		shell.openExternal(this.href);
 });
 
-function changeTab(tabname){
-	$('#tabMenu').children().each(function(){
-		if ($(this).attr("data-tab") == tabname){
-			$(this).addClass('active');
-		}
-		else {
-			$(this).removeClass('active');
-		}
+$(document).ready(() => {
+	loadingScreen(true, "Setting up analysis pipeline...");
+	$('.tabular menu .item').tab();
+});
+
+setupMainProcessIPC();
+setupZeroMQ();
+
+function setupMainProcessIPC(){
+	ipc.on('mainjs-error', (event, message) => {
+		errorMessage(true, message);
 	});
-	$.tab('change tab', tabname);
+	ipc.on('mainjs-message', (event, message) => {
+		console.log("ERROR in main.js");
+	});
+}
+
+function setupZeroMQ(){
+	socket.connect("tcp://127.0.0.1:4242");
+	console.log("socket connected on port 4242");
+	socket.on("message", zmq_broker);
+	socket.send(JSON.stringify(['ready']));
 }
 
 function zmq_broker(message){
-	// try{
 	results = JSON.parse(message);
 	console.log(results);
 
@@ -83,6 +89,7 @@ function zmq_broker(message){
 
 		case 'run_analysis':
 			if (results[1][0] == "preview"){
+				$('#beginAnalysisButton').removeClass('loading');
 				run_first_analysis_handler(results[1]);
 			}
 			else{
@@ -93,23 +100,23 @@ function zmq_broker(message){
 		default:
 			console.log(message.toString())
 		}
-// 	}
-// 	catch {
-// 		console.log("Message not understood.");
-// 	}
 }
-
-function setupZeroMQ(){
-	socket.connect("tcp://127.0.0.1:4242");
-	console.log("socket connected on port 4242");
-	socket.on("message", zmq_broker);
-	socket.send(JSON.stringify(['ready']));
-}
-
 
 //Document setup
 function setupDocument(){
 	resetAnalysis();
+}
+
+function changeTab(tabname){
+	$('#tabMenu').children().each(function(){
+		if ($(this).attr("data-tab") == tabname){
+			$(this).addClass('active');
+		}
+		else {
+			$(this).removeClass('active');
+		}
+	});
+	$.tab('change tab', tabname);
 }
 
 function resetAnalysis(){
@@ -269,7 +276,7 @@ function closeFilePickerModal(){
 function load_analysis(fn){
 	let fileName = fn;
 	let analysisIndex = analysis_filenames.indexOf(fileName)
-	show_new_analysis_results(analysis_results_graphdata[fileName][0],analysis_results_graphdata[fileName][1],analysis_results_graphdata[fileName][2],analysis_results_graphdata[fileName][3])
+	show_new_analysis_results(analysis_results_graphdata[fileName][0],analysis_results_graphdata[fileName][1],analysis_results_graphdata[fileName][2],analysis_results_graphdata[fileName][3],analysis_results_graphdata[fileName][4])
 }
 
 function load_analysis_to_dict(fn){
@@ -277,7 +284,7 @@ function load_analysis_to_dict(fn){
 	let analysisIndex = analysis_filenames.indexOf(fileName)
 	let analysis_data = analysis_results[analysisIndex].fit_data
 
-	analysis_results_graphdata[fileName] = [analysis_data[0],analysis_data[1],analysis_data[2],analysis_data[3]]
+	analysis_results_graphdata[fileName] = [analysis_data[0],analysis_data[1],analysis_data[2],analysis_data[3], analysis_data[4]]
 }
 
 function make_preview(){
@@ -288,8 +295,6 @@ function make_preview(){
 			min_length = Math.min(file_data_dict[filenames[i]].length,min_length);
 		}
 	}
-
-	console.log(min_length);
 
 	preview_data = []
 	for (let i=0; i < filenames.length; i++){
@@ -310,7 +315,7 @@ function make_preview(){
 	loadingScreen(false)
 	paramDimmer(true,'G0/G1 estimate')
 
-	$('#analysisChart').click(function(evt) {
+	$('#analysisChart').click( function(evt) {
 		try {
 			let index = previewChart.getElementsAtXAxis(evt)[0]._index
 			let value = parseFloat(previewChart.scales["x-axis-0"].ticks[index]);
@@ -334,6 +339,9 @@ function make_preview(){
 				paramDimmer(false);
 				$('#high_text').text(high_cutoff.toFixed(2))
 			}
+
+			previewChart.options.annotation.annotations = get_annotations();
+			previewChart.update();
 		}
 		catch (error) {
 			console.error(error);
@@ -356,17 +364,76 @@ function changeFileProperty(val){
 	}
 }
 
+function get_annotations(){
+	let annotation_array = []
+
+	if (g1_guess != null){
+		annotation_array.push({
+			type: 'line',
+			scaleID: 'x-axis-0',
+			value: g1_guess,
+			borderColor: 'rgba(0,0,0,0.25)',
+			borderWidth: 2
+		})
+	}
+
+	if (g2_guess != null){
+		annotation_array.push({
+			type: 'line',
+			scaleID: 'x-axis-0',
+			value: g2_guess,
+			borderColor: 'rgba(0,0,0,0.25)',
+			borderWidth: 2
+		})
+	}
+
+	if (low_cutoff != null){
+		annotation_array.push({
+			type: 'box',
+			xScaleID: 'x-axis-0',
+			yScaleID: 'y-axis-0',
+			xMin: low_cutoff,
+			xMax: low_cutoff,
+			yMin: 0,
+			yMax: previewChart.scales["y-axis-0"].max,
+			borderColor: 'rgba(100,100,100,0.25)',
+			backgroundColor: 'rgba(100,100,100,0.1)',
+			borderWidth: 2
+		})
+	}
+
+	if (high_cutoff != null){
+		annotation_array.push({
+			type: 'box',
+			xScaleID: 'x-axis-0',
+			yScaleID: 'y-axis-0',
+			xMin: low_cutoff,
+			xMax: high_cutoff,
+			yMin: 0,
+			yMax: previewChart.scales["y-axis-0"].max,
+			borderColor: 'rgba(100,100,100,0.25)',
+			backgroundColor: 'rgba(100,100,100,0.1)',
+			borderWidth: 2
+		})
+	}
+
+	return annotation_array;
+}
+
 function draw_histogram(ctx, data, tooltips_enabled=true){
 	let hist_data = hist(data, -1);
 
 	let graph_data = hist_data[0];
 	let buckets = hist_data[1];
 
+	annotation_array = get_annotations()
+
 	Chart.defaults.global.legend.display = false;
 	return new Chart(ctx, {
 		type: 'line',
+		plugins: [chartjs_annotation],
 		data: {
-			labels: buckets.map(String),
+			labels: buckets,
 			datasets: [{
 				data: graph_data,
 				backgroundColor: 'rgba(255, 99, 132, 0.2)',
@@ -375,6 +442,9 @@ function draw_histogram(ctx, data, tooltips_enabled=true){
 				}]
 		},
 		options: {
+			annotation: {
+				annotations: annotation_array
+				},
 			tooltips : { enabled: tooltips_enabled },
 			scales: {
 				xAxes: [{
@@ -392,17 +462,11 @@ function draw_histogram(ctx, data, tooltips_enabled=true){
 	});
 }
 
-function start_analysis(){
-	loadingScreen(true, "Waiting for first file to finish analysis.");
-
-	for (let i =0; i < fileNames.length; i++){
-		run_analysis(fileNames.pop())
-	}
-}
-
 //run only selected file preview data to obtain standard deviation
 function run_first_analysis(){
 	loadingScreen(true, "Running first pass analysis on aggregate data.");
+	changeTab('results');
+	$('#beginAnalysisButton').addClass('loading');
 	let tempdatafile = "tdf"
 	temp.open(tempdatafile, function(err,info) {
 		if (!err) {
@@ -426,6 +490,14 @@ function run_first_analysis_handler(results){
 
 	console.log("preview analysis back")
 	start_analysis();
+}
+
+function start_analysis(){
+	loadingScreen(true, "Waiting for first file to finish analysis.");
+
+	for (let i =0; i < fileNames.length; i++){
+		run_analysis(fileNames.pop())
+	}
 }
 
 function run_analysis(fn){
@@ -513,6 +585,17 @@ function loadingScreen(enabled, message){
 		$("#loadingModal").modal('hide');
 	}
 	$("#loadingText").html(message)
+}
+
+function errorMessage(enabled, message){
+	if (enabled){
+		$("#loadingModal").modal('hide');
+		$("#errorMsg").html(message);
+		$("#errorModal").modal('show');
+	}
+	else {
+		$("#messageModal").modal('hide');
+	}
 }
 
 function paramDimmer(enabled, parameter){
@@ -622,43 +705,51 @@ function hist(data, max_values = 25000, min_x = null, max_x = null){
 }
 
 //Loads analysis results to graph
-function show_new_analysis_results(x_data,g1_data,g2_data,s_data){
+function show_new_analysis_results(x_data,g1_data,g2_data,s_data,all_data){
 		$('#resultsChart').remove();
 		$('#resultsChartContainer').append("<canvas id='resultsChart' width='400' height='300'></canvas>");
 		let ctx = $('#resultsChart');
 
-		var myChart = new Chart(ctx, {
-			type: 'bar',
-			data: {
-				labels: x_data.map(String),
-				datasets: [{
-					type: 'line',
-					data: s_data,
-					backgroundColor: GRAPH_COLORS[0],
-					borderColor: GRAPH_COLORS[0],
-					borderWidth: 1
+		var myChart = new Chart(ctx,
+			{
+				type: 'bar',
+				data: {
+					labels: x_data.map(String),
+					datasets: [{
+						type: 'line',
+						data: s_data,
+						backgroundColor: GRAPH_COLORS[0],
+						borderColor: GRAPH_COLORS[0],
+						borderWidth: 1
+						},
+						{
+						type: 'line',
+						data: g1_data,
+						backgroundColor: GRAPH_COLORS[1],
+						borderColor: GRAPH_COLORS[1],
+						borderWidth: 1
+						},
+						{
+						type: 'line',
+						data: g2_data,
+						backgroundColor: GRAPH_COLORS[2],
+						borderColor: GRAPH_COLORS[2],
+						borderWidth: 1
 					},
-					{
-					type: 'line',
-					data: g1_data,
-					backgroundColor: GRAPH_COLORS[1],
-					borderColor: GRAPH_COLORS[1],
-					borderWidth: 1
-					},
-					{
-					type: 'line',
-					data: g2_data,
-					backgroundColor: GRAPH_COLORS[2],
-					borderColor: GRAPH_COLORS[2],
-					borderWidth: 1
-					}
-					]
-			},
-			options: {
-				scales: {
-					xAxes: [{
-						ticks: {
-							display: false
+						{
+						type: 'bar',
+						data: all_data,
+						backgroundColor: GRAPH_COLORS[2],
+						borderColor: GRAPH_COLORS[2],
+						borderWidth: 1
+						}
+						]
+				},
+				options: {
+					scales: {
+						xAxes: [{
+							ticks: {
+								display: false
 						}
 					}]
 				}
