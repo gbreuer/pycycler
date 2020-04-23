@@ -742,8 +742,8 @@ function show_new_analysis_results(x_data,g1_data,g2_data,s_data,all_data){
 						{
 						type: 'bar',
 						data: all_data,
-						backgroundColor: GRAPH_COLORS[2],
-						borderColor: GRAPH_COLORS[2],
+						backgroundColor: 'rgba(175,175,175,0.6)',
+						borderColor: 'rgba(175,175,175,0.6)',
 						borderWidth: 1
 						}
 						]
@@ -751,11 +751,14 @@ function show_new_analysis_results(x_data,g1_data,g2_data,s_data,all_data){
 				options: {
 					scales: {
 						xAxes: [{
-							ticks: {
-								display: false
-						}
-					}]
+							gridLines: { drawOnChartArea: false,
+													drawTicks: false},
+							ticks: { display: false	}
+						}],
+						yAxes: [{
+							ticks: { display: false	}
+						}]
+					}
 				}
-			}
 		});
 }

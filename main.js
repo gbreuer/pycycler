@@ -24,7 +24,7 @@ function createWindow () {
   mainWindow.loadFile('src/index.html')
 
   // Open the DevTools for debugging rendering errors.
-  // mainWindow.webContents.openDevTools()
+  //mainWindow.webContents.openDevTools()
 
   // Emitted when the window is closed.
   mainWindow.on('closed', function () {
@@ -39,7 +39,7 @@ const createServer = () => {
   //TODO: Add OSX support
   switch (process.platform){
     case 'linux':
-      executable = path.join(__dirname,'dist/cycler_wrapper_zeromq');
+      executable = path.join(__dirname,'dist/cycler_wrapper_zeromq/cycler_wrapper_zeromq');
       break;
 
     case 'win32':
