@@ -20,6 +20,7 @@ function createWindow () {
   mainWindow.webContents.on('dom-ready', createServer);
 
   mainWindow.setMenu(null);
+  mainWindow.setResizable(false);
 
   mainWindow.loadFile('src/index.html')
 

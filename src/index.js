@@ -614,7 +614,7 @@ function paramDimmer(enabled, parameter){
 
 function draw_graph(){
 	$('#analysisChart').remove();
-	$('#chartContainer').append("<canvas id='analysisChart' width='400' height='300'></canvas>");
+	$('#chartContainer').append("<canvas id='analysisChart' width='400' height='300' style='border:3px solid #dedede'></canvas>");
 	let ctx = $('#analysisChart');
 	let myChart = new Chart(ctx, {
 		type: 'bar',
@@ -710,7 +710,7 @@ function hist(data, max_values = 25000, min_x = null, max_x = null){
 //Loads analysis results to graph
 function show_new_analysis_results(x_data,g1_data,g2_data,s_data,all_data){
 		$('#resultsChart').remove();
-		$('#resultsChartContainer').append("<canvas id='resultsChart' width='400' height='300'></canvas>");
+		$('#resultsChartContainer').append("<canvas id='resultsChart' width='400' height='300' style='border:3px solid #dedede'></canvas>");
 		let ctx = $('#resultsChart');
 
 		var myChart = new Chart(ctx,

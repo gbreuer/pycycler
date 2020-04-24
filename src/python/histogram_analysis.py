@@ -104,7 +104,7 @@ def refined_analysis(data, x_min, x_max, g1_guess, g2_guess, stdev=-1, target_ra
 	g2_max_val = len(filt_values)*g1_opt[1]
 	g2_peak = 2*g1_opt[2]/(target_range/high)
 
-	x_vals = linspace(min(filt_values), max(filt_values), 500)
+	x_vals = linspace(min(filt_values), max(filt_values), 150)
 	kd2 = KernelDensity(bandwidth=0.03*target_range)
 	kd2.fit(filt_values[:, None])
 	s_histogram = np.exp(kd2.score_samples(x_vals[:,None]))

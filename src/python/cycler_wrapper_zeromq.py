@@ -153,26 +153,29 @@ def process_request(in_q, out_q):
 	print("Worker started.")
 
 	while in_q:
-		message = in_q.get()
-		method = message[0]
-		args = ['']+message
+		try:
+			message = in_q.get()
+			method = message[0]
+			args = ['']+message
 
-		ret = json.dumps(['OK'])
+			ret = json.dumps(['OK'])
 
-		if method == 'check_file':
-			ret = json.dumps(['check_file',check_file(args)])
+			if method == 'check_file':
+				ret = json.dumps(['check_file',check_file(args)])
 
-		elif method == 'get_data':
-			ret = json.dumps(['get_data',get_data(args)])
+			elif method == 'get_data':
+				ret = json.dumps(['get_data',get_data(args)])
 
-		elif method == 'get_preview':
-			ret = json.dumps(['get_preview',get_data(args)])
+			elif method == 'get_preview':
+				ret = json.dumps(['get_preview',get_data(args)])
 
-		elif method == 'run_analysis':
-			ret = json.dumps(['run_analysis',run_analysis(args)])
+			elif method == 'run_analysis':
+				ret = json.dumps(['run_analysis',run_analysis(args)])
 
-		elif method == 'load_all_files':
-			ret = json.dumps(['load_all_files',load_all_files(args)])
+			elif method == 'load_all_files':
+				ret = json.dumps(['load_all_files',load_all_files(args)])
+		except:
+			ret = json.dumps(['failed'])
 
 		out_q.put(ret)
 
@@ -197,6 +200,7 @@ if __name__ == '__main__':
 
 	exit_signal = False
 
+	worker_list = []
 	#Use processes for heavy computation
 	in_q = multiprocessing.Queue()
 	out_q = multiprocessing.Queue()
@@ -205,52 +209,64 @@ if __name__ == '__main__':
 		worker = Process(target=process_request, args=(in_q,out_q,))
 		worker.daemon = True
 		worker.start()
+		worker_list.append(worker)
 
-	timeout_timer = time.time()
-	while True:
-		#Prevents ZMQError when no messages have arrived.
-		try:
-			message = socket.recv(zmq.NOBLOCK)
-			timeout_timer = time.time()
-
-			message = json.loads(message)
-
-			print(message)
-
-			if message:
-				in_q.put(message)
-
-		except:
-			pass
-
-		while not out_q.empty():
-			response = out_q.get()
+	try:
+		timeout_timer = time.time()
+		while True:
+			#Prevents ZMQError when no messages have arrived.
 			try:
-				socket.send_string(response, flags=zmq.NOBLOCK)
-			except:
-				out_q.put_nowait(response)
+				message = socket.recv(zmq.NOBLOCK)
+				timeout_timer = time.time()
 
-		#Check if parent process terminated
-		if time.time()-timeout_timer > 5.0:
-			print("No response from application...")
+				message = json.loads(message)
+
+				print(message)
+
+				if message:
+					in_q.put(message)
+
+			except:
+				pass
+
+			while not out_q.empty():
+				response = out_q.get()
+				try:
+					socket.send_string(response, flags=zmq.NOBLOCK)
+				except:
+					out_q.put_nowait(response)
+
+			#Check if parent process terminated
+			if time.time()-timeout_timer > 5.0:
+				print("No response from application...")
+				try:
+					socket.send_string(ALIVE_SIGNAL, flags=zmq.NOBLOCK)
+				except:
+					out_q.put_nowait(ALIVE_SIGNAL)
+
+			if time.time() - timeout_timer > 6.0:
+				exit_signal = True
+
+			if exit_signal:
+				print("Exiting due to no response from application.")
+				break
+
+			time.sleep(0.1)
+
+	finally:
+		print("Exiting...")
+
+		#Remove all elements from queues
+		clear_queue(in_q)
+		clear_queue(out_q)
+		in_q.close()
+		out_q.close()
+		in_q = None
+		out_q = None
+
+		#Wait for workers to terminate and kill if stalled
+		for w in worker_list:
 			try:
-				socket.send_string(ALIVE_SIGNAL, flags=zmq.NOBLOCK)
+				w.join(timeout=1)
 			except:
-				out_q.put_nowait(ALIVE_SIGNAL)
-
-		if time.time() - timeout_timer > 6.0:
-			exit_signal = True
-
-		if exit_signal:
-			print("Exiting due to no response from application.")
-			clear_queue(in_q)
-			clear_queue(out_q)
-
-			in_q.close()
-			out_q.close()
-
-			in_q = None
-			out_q = None
-			break
-
-		time.sleep(0.1)
+				w.terminate()
