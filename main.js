@@ -51,8 +51,8 @@ const createServer = () => {
   //Check if python backend exists and report errors if not.
   if (fs.existsSync(executable)){
     console.log("Attempting to start python back-end at "+executable);
-
-    backendServer = spawn(executable);
+    console.log('"'+executable+'"');
+    backendServer = spawn('"'+executable+'"', options={shell:true});
 
     if (backendServer != null){
       console.log("Server started: "+backendServer.pid.toString());

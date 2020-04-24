@@ -5,9 +5,9 @@ import json
 import pandas as pd
 from multiprocessing import Process
 import zmq
+import queue
 
 NUM_WORKERS = 6
-EXIT_COMMAND = 'KILL'
 ALIVE_SIGNAL = json.dumps(['test'])
 
 def load_all_files(options):
@@ -149,35 +149,54 @@ def run_analysis(options):
 
 	return stdout
 
-def process_request(in_q, out_q):
-	print("Worker started.")
+class WorkerProcess(Process):
+	def __init__(self,in_q,out_q):
+		print("Starting worker process.")
+		Process.__init__(self)
+		self.exit = multiprocessing.Event()
+		self.in_q = in_q
+		self.out_q = out_q
 
-	while in_q:
+	def run(self):
+		while not self.exit.is_set():
+			self.do_work()
+		print("Exiting worker.")
+
+	def shutdown(self):
+		print("Shutdown signal received.")
+		self.exit.set()
+
+	def do_work(self):
 		try:
-			message = in_q.get()
-			method = message[0]
-			args = ['']+message
+			message = self.in_q.get_nowait()
 
-			ret = json.dumps(['OK'])
+			try:
+				method = message[0]
+				args = ['']+message
 
-			if method == 'check_file':
-				ret = json.dumps(['check_file',check_file(args)])
+				ret = json.dumps(['OK'])
 
-			elif method == 'get_data':
-				ret = json.dumps(['get_data',get_data(args)])
+				if method == 'check_file':
+					ret = json.dumps(['check_file',check_file(args)])
 
-			elif method == 'get_preview':
-				ret = json.dumps(['get_preview',get_data(args)])
+				elif method == 'get_data':
+					ret = json.dumps(['get_data',get_data(args)])
 
-			elif method == 'run_analysis':
-				ret = json.dumps(['run_analysis',run_analysis(args)])
+				elif method == 'get_preview':
+					ret = json.dumps(['get_preview',get_data(args)])
 
-			elif method == 'load_all_files':
-				ret = json.dumps(['load_all_files',load_all_files(args)])
-		except:
-			ret = json.dumps(['failed'])
+				elif method == 'run_analysis':
+					ret = json.dumps(['run_analysis',run_analysis(args)])
 
-		out_q.put(ret)
+				elif method == 'load_all_files':
+					ret = json.dumps(['load_all_files',load_all_files(args)])
+			except:
+				ret = json.dumps(['failed'])
+
+			self.out_q.put(ret)
+
+		except queue.Empty:
+			time.sleep(0.1)
 
 def clear_queue(queue):
 	while not queue.empty():
@@ -198,15 +217,15 @@ if __name__ == '__main__':
 	print("Connected. Starting worker processes...")
 	socket.send_string(json.dumps(['OK']))
 
-	exit_signal = False
-
-	worker_list = []
-	#Use processes for heavy computation
 	in_q = multiprocessing.Queue()
 	out_q = multiprocessing.Queue()
 
+	worker_list = []
+	#Use processes for heavy computation
+	exit_signal = False
+
 	for i in range(NUM_WORKERS):
-		worker = Process(target=process_request, args=(in_q,out_q,))
+		worker = WorkerProcess(in_q, out_q)
 		worker.daemon = True
 		worker.start()
 		worker_list.append(worker)
@@ -218,9 +237,7 @@ if __name__ == '__main__':
 			try:
 				message = socket.recv(zmq.NOBLOCK)
 				timeout_timer = time.time()
-
 				message = json.loads(message)
-
 				print(message)
 
 				if message:
@@ -238,7 +255,7 @@ if __name__ == '__main__':
 
 			#Check if parent process terminated
 			if time.time()-timeout_timer > 5.0:
-				print("No response from application...")
+				print("Keepalive sent.")
 				try:
 					socket.send_string(ALIVE_SIGNAL, flags=zmq.NOBLOCK)
 				except:
@@ -256,6 +273,11 @@ if __name__ == '__main__':
 	finally:
 		print("Exiting...")
 
+		#Wait for workers to terminate and kill if stalled
+		for w in worker_list:
+			w.shutdown()
+			w.join(timeout=2)
+
 		#Remove all elements from queues
 		clear_queue(in_q)
 		clear_queue(out_q)
@@ -263,10 +285,3 @@ if __name__ == '__main__':
 		out_q.close()
 		in_q = None
 		out_q = None
-
-		#Wait for workers to terminate and kill if stalled
-		for w in worker_list:
-			try:
-				w.join(timeout=1)
-			except:
-				w.terminate()
