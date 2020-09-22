@@ -1,5 +1,5 @@
 {
-  "name": "Cycler",
+  "name": "pyCycler",
   "version": "1.0.0",
   "description": "Automated cell-cycle analysis.",
   "main": "main.js",
@@ -8,7 +8,7 @@
     "package": "electron-forge package",
     "make": "electron-forge make"
   },
-  "repository": "https://github.com/gbreuer/cycler",
+  "repository": "https://github.com/gbreuer/pycycler",
   "keywords": [],
   "author": "Gregory Breuer",
   "license": "MIT",
@@ -38,7 +38,7 @@
         {
           "name": "@electron-forge/maker-squirrel",
           "config": {
-            "name": "Cycler"
+            "name": "pyCycler"
           }
         },
         {

@@ -27,6 +27,12 @@
       -webkit-user-select: none;
       user-select: none;
   	}
+
+    .imgPreview{
+      height:500px;
+      object-fit:cover;
+    }
+
   </style>
 
   <script>
@@ -34,17 +40,23 @@
     .ready(function() {
       $('.menu .item').tab();
 
-  	//TODO: Delete
-  	setupDocument();
-  	draw_graph()
-  	$('#paramDropdown').dropdown({onChange: function(val){ changeFileProperty(val);}});
-  	$('#fileDropdown').dropdown({onChange: function(val){ changeAnalysisFilename(val);}});
+    	//TODO: Delete
+    	setupDocument();
+    	draw_graph()
+    	$('#paramDropdown').dropdown({onChange: function(val){ changeFileProperty(val);}});
+      $('#imageFileDropdown').dropdown({onChange: function(val){ changeImageFile(val);}});
+    	$('#fileDropdown').dropdown({onChange: function(val){ changeAnalysisFilename(val);}});
 
-    $('.tab.segment').css('min-height',$(window).height()-$('#tabMenu').height()-28)
-    $('.tab.segment').css('max-height',$(window).height()-$('#tabMenu').height()-28)
+      $('.tab.segment').css('min-height',$(window).height()-$('#tabMenu').height()-28)
+      $('.tab.segment').css('max-height',$(window).height()-$('#tabMenu').height()-28)
 
-    $('#serverSetupModal').modal('show');
-  });
+      $('#serverSetupModal').modal('show');
+      $('.ui.bottom.sidebar')
+        .sidebar('setting','transition','overlay')
+        .sidebar('setting','closable',false)
+        .sidebar('setting','dimPage',false)
+        .sidebar('show');
+    });
   ;
   </script>
 </head>
@@ -75,12 +87,13 @@
 <div class="pusher">
   <div id="tabMenu" class="ui top attached secondary pointing menu">
     <div class="active item" data-tab="welcome">Start</div>
+    <div class="item" data-tab="image_analysis">Image Analysis</div>
     <div class="item" data-tab="file_select">Select Files</div>
     <div class="item" data-tab="analysis_settings">Settings</div>
     <div class="item" data-tab="results">Results</div>
     <div class="item" data-tab="about">About</div>
   </div>
-  <div id="firstPage" class="ui active bottom attached transition fade in tab segment" data-tab="welcome">
+  <div id="firstPage" class="ui active bottom attached transition fade in basic tab segment" data-tab="welcome">
     <div class="ui basic segment">
       <div class="ui centered grid">
         <div class="row"><div class="column"><h1>pyCycler</h1></div></div>
@@ -96,9 +109,65 @@
           </div>
         </div>
         <div class="row">
-          <div class="ten wide center aligned column">
-            <h3>Begin by selecting .FCS or .CSV files containing fluorescent DNA data.</h3>
-    	      <div class="ui huge primary button" onclick="load_files()" style="margin-top:20px"><i class="folder outline icon"></i> Load Files</div>
+          <div class="ui very padded secondary segment" id="drag-file" onclick="load_file_dialog()" style="border-width: 3px; border-style: dashed">
+            <div class="ui icon header">
+              <i class="file outline icon"></i>
+              Click here or drag and drop .FCS, .CSV, or image files here to begin analysis.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ui bottom attached transition fade in tab segment" data-tab="image_analysis">
+    <div id="filePickerModal" class="ui basic segment">
+      <div class="ui centered grid">
+        <div class="row">
+          <div class="ten wide column">
+            <h1>Adjust Image Analysis Parameters</h1>
+          </div>
+          <div class="six wide column">
+      			<div id="imageFileDropdown" class="ui fluid selection dropdown">
+      				<i class="dropdown icon"></i>
+      				<div class="default text">Select Example Image</div>
+      				<div id="imageDropdownMenu" class="menu">
+      				</div>
+      			</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="column">Please adjust your settings to get the best histogram.</div>
+        </div>
+        <div class="row">
+          <div class="eight wide column">
+            <img id="previewImg" class="imgPreview">
+          </div>
+          <div class="eight wide column">
+            <div class="ui padded relaxed grid segment">
+              <div class="row">
+                <h3>Analysis Parameters</h3>
+              </div>
+              <div class="two column row">
+                <div class="middle aligned column">
+                  Nuclear Diameter (pixels)
+                </div>
+                <div class="column">
+                  <div class="ui fluid input">
+                    <input id="nucDiameterInput" type="text" value="12">
+                  </div>
+                </div>
+              </div>
+            </div>
+        		<div id="imageChartContainer" class="ui basic segment" style="max-width:600px; max-height:500px">
+        			<canvas id="previewImageAnalysisChart" width="400" height="300"></canvas>
+        		</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="right aligned fluid column">
+            <button class='ui secondary button' onclick="previewImageAnalysis()">Preview</button>
+            <button class='ui primary button' onclick="runImageAnalysis()">Analyze Images</button>
           </div>
         </div>
       </div>
@@ -220,40 +289,31 @@
           </div>
         </div>
         <div class="row">
-          <div class="eight wide column">
+          <div class="six wide column">
         		<div id="resultsChartContainer" class="ui basic segment">
-        			<canvas id="resultsChart" width="400" height="300"></canvas>
+        			<canvas id="resultsChart" style='height:200px'></canvas>
         		</div>
           </div>
-          <div class="five wide column">
-        		<div class="ui segment" style="overflow-y: scroll; height:400px; max-height:600px">
-              <div id="resultsTable" class="ui relaxed divided list">
-                <a class="item">
-                  <div class="content">
-                    <div class="header">Filename</div>
-                    <div class="description">
-                      <div class="ui horizontal list">
-                        <div class="item">G1/G0 %:</div>
-                        <div class="item">G2/M %:</div>
-                        <div class="item">S %:</div>
-                      </div>
-                    </div>
-                  </div>
-                </a>
-
-                <a class="item">
-                  <div class="content">
-                    <div class="header">Filename</div>
-                    <div class="description">
-                      <div class="ui centered three column grid">
-                        <div class="column">G1/G0 %:</div>
-                        <div class="column">G2/M %:</div>
-                        <div class="column">S %:</div>
-                      </div>
-                    </div>
-                  </div>
-                </a>
-              </div>
+          <div class="eight wide column">
+        		<div class="ui padded segment" style="overflow-y: scroll; height:500px; max-height:500px">
+              <table class="ui striped table">
+                <thead>
+                  <th>Name</th>
+                  <th>Cell Count</th>
+                  <th>G1/G0</th>
+                  <th>G2/M</th>
+                  <th>S</th>
+                </thead>
+                <tbody id="resultsBody" align="center" style="font-size:12px">
+                  <tr>
+                    <td>Filename.csv</td>
+                    <td>2583</td>
+                    <td>15%</td>
+                    <td>10%</td>
+                    <td>1%</td>
+                  </tr>
+                </tbody>
+              </table>
         		</div>
           </div>
         </div>
@@ -291,5 +351,4 @@
     </div>
   </div>
 </div>
-
 </body></html>

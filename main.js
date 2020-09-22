@@ -13,7 +13,8 @@ function createWindow () {
     width: 1200,
     height: 900,
     webPreferences: {
-      nodeIntegration: true
+      nodeIntegration: true,
+      webSecurity: false
     }
   });
 
@@ -25,7 +26,7 @@ function createWindow () {
   mainWindow.loadFile('src/index.html')
 
   // Open the DevTools for debugging rendering errors.
-  //mainWindow.webContents.openDevTools()
+  mainWindow.webContents.openDevTools()
 
   // Emitted when the window is closed.
   mainWindow.on('closed', function () {

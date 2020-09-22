@@ -3,8 +3,8 @@
 # v0.11 - Fixed to auto-scale to mean value of 50 to make sure curve_fitting parameters are optimized appropriately
 
 import numpy as np
-from numpy import mean, size, zeros, where, transpose
-from scipy import linspace, signal, arange
+from numpy import mean, size, zeros, where, transpose, linspace
+from scipy import signal, arange
 from scipy.optimize import curve_fit
 from scipy.integrate import quad
 from scipy.stats import norm
@@ -17,7 +17,11 @@ def normal_curve(x,a,b,c):
 def twin_peaks(x,a1,a2,b,c):
 	return normal_curve(x,a1,b,c)+normal_curve(x,a2,2*b,c)
 
-def refined_analysis(data, x_min, x_max, g1_guess, g2_guess, stdev=-1, target_range=100., output_filename=None):
+def exponential(x,a,b):
+	return a*x**b
+
+def refined_analysis(data, x_min, x_max, g1_guess, g2_guess, stdev=-1, target_range=100., output_filename=None, correct_exp=True):
+	x_min = 0
 	FIT_MARGIN = 0.1
 	raw_values = data
 
@@ -34,12 +38,21 @@ def refined_analysis(data, x_min, x_max, g1_guess, g2_guess, stdev=-1, target_ra
 	#select random 5000 values to keep calculation time lower
 	filt_values = np.random.choice(filt_values,5000)
 
-	#TODO: check math
+	if correct_exp:
+		fit, cov = curve_fit(exponential, [0, g1_guess, g2_guess], [0.0, 15.0, 30.0])
+
+		raw_values = exponential(raw_values, fit[0], fit[1])
+		filt_values = exponential(filt_values, fit[0], fit[1])
+		x_min = exponential(x_min, fit[0], fit[1])
+		x_max = exponential(x_max, fit[0], fit[1])
+		g1_guess = exponential(g1_guess, fit[0], fit[1])
+		g2_guess = exponential(g2_guess, fit[0], fit[1])
+
 	high = np.max(filt_values)
 	filt_values *= target_range/high
 	raw_values *= target_range/high
 	x_min = (x_min)*(target_range/high)
-	x_max = (x_max )*(target_range/high)
+	x_max = (x_max)*(target_range/high)
 	g1_guess = (g1_guess)*(target_range/high)
 	g2_guess = (g2_guess)*(target_range/high)
 	stdev = (stdev)*(target_range/high)
@@ -79,7 +92,7 @@ def refined_analysis(data, x_min, x_max, g1_guess, g2_guess, stdev=-1, target_ra
 			bounds=([0,0,(1-FIT_MARGIN)*g1_guess,0.95*stdev],[1,1,(1+FIT_MARGIN)*g1_guess,1.05*stdev]))
 	else:
 		g1_opt, cov = curve_fit(twin_peaks, x_range_peaks, y_range_peaks, [g1_peak_value, g2_peak_value, g1_guess, stdev],\
-			bounds=([0,0,(1-FIT_MARGIN)*g1_guess,0.001*stdev],[1,1,(1+FIT_MARGIN)*g1_guess,1000*stdev]))
+			bounds=([0,0,(1-FIT_MARGIN)*g1_guess,0.1*stdev],[1,1,(1+FIT_MARGIN)*g1_guess,1.2*stdev]))
 		#g1_opt, cov = curve_fit(all_curves, x_range, y_range, start_guess, bounds=([0,0,g1_guess*0.95,0.001*target_range,-0.1,-50,0,g1_guess],[1,1,g1_guess*1.05,0.1*g1_guess,0.1,50,1,2*g1_guess]), maxfev=250)
 
 	#TODO: adjust number of points taken here
@@ -114,6 +127,7 @@ def refined_analysis(data, x_min, x_max, g1_guess, g2_guess, stdev=-1, target_ra
 	s_plot[np.where(x_vals > 2*g1_opt[2])] = 0
 	s_plot = np.array([np.mean(s_plot[max(0,i-5):min(len(s_plot)-1,i+6)]) for i in range(len(s_plot))])
 
+
 	return_dict = {}
 	return_dict['g1_pct'] = g1_pct
 	return_dict['g2_pct'] = g2_pct
@@ -125,5 +139,4 @@ def refined_analysis(data, x_min, x_max, g1_guess, g2_guess, stdev=-1, target_ra
 	return_dict['fit_data'] = [x_vals.tolist(), normal_curve(x_vals, g1_opt[1], 2*g1_opt[2], g1_opt[3]).tolist(), normal_curve(x_vals, g1_opt[0], g1_opt[2], g1_opt[3]).tolist(), s_plot.tolist(), [0]+np.histogram(raw_values, bins=x_vals, normed=True)[0].tolist()]
 	return_dict['g1_opt'] = [g1_max_val, g1_peak, g1_opt_std]
 	return_dict['g2_opt'] = [g2_max_val, g2_peak, g1_opt_std]
-
 	return return_dict

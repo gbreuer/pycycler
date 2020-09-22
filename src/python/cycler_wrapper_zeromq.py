@@ -1,11 +1,15 @@
 import sys, os, time, queue, multiprocessing, threading
 import fcsparser
-from histogram_analysis import refined_analysis
 import json
 import pandas as pd
 from multiprocessing import Process
 import zmq
 import queue
+import math
+import traceback
+
+from histogram_analysis import refined_analysis
+from image_processor import count_cells
 
 NUM_WORKERS = 6
 ALIVE_SIGNAL = json.dumps(['test'])
@@ -149,6 +153,48 @@ def run_analysis(options):
 
 	return stdout
 
+def preview_image(options):
+	image_filename = options[2]
+	#image file
+	output_filename = options[3]
+
+	minThreshold = int(options[4])
+	maxThreshold = int(options[5])
+	estDiameter = float(options[6])
+
+	minArea = 0.33*math.pi*(estDiameter**2)/4
+	maxArea = 3*math.pi*(estDiameter**2)/4
+	maxKeypoints = 5000
+
+	stdout = []
+	stdout.append(image_filename)
+	stdout.append(output_filename)
+	stdout.append(count_cells(image_filename, output_filename, minArea, maxArea, minThreshold, maxThreshold, maxKeypoints))
+
+	return stdout
+
+def analyze_image(options):
+	image_filename = options[2]
+	output_filename = options[3]
+
+	minThreshold = int(options[4])
+	maxThreshold = int(options[5])
+	estDiameter = float(options[6])
+
+	output_csv_filename = options[7]
+
+	minArea = 0.33*math.pi*(estDiameter**2)/4
+	maxArea = 3*math.pi*(estDiameter**2)/4
+	maxKeypoints = 5000
+
+	stdout = []
+	stdout.append(image_filename)
+	stdout.append(output_filename)
+	stdout.append(output_csv_filename)
+	stdout.append(count_cells(image_filename, output_filename, minArea, maxArea, minThreshold, maxThreshold, maxKeypoints, output_csv_filename))
+
+	return stdout
+
 class WorkerProcess(Process):
 	def __init__(self,in_q,out_q):
 		print("Starting worker process.")
@@ -190,7 +236,16 @@ class WorkerProcess(Process):
 
 				elif method == 'load_all_files':
 					ret = json.dumps(['load_all_files',load_all_files(args)])
-			except:
+
+				elif method == 'analyze_image':
+					ret = json.dumps(['analyze_image',analyze_image(args)])
+
+				elif method == 'preview_image_analysis':
+					ret = json.dumps(['preview_image_analysis',preview_image(args)])
+
+			except Exception as e:
+				print(traceback.format_exc())
+
 				ret = json.dumps(['failed'])
 
 			self.out_q.put(ret)
