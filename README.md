@@ -1,4 +1,4 @@
-# pyCycler automated cell cycle profiling application
+# pyCycler: An Automated Cell Cycle Profiling Application for Fluorescence Microscopy
 
 **Analyze multiple cell-cycle experiments at once.**
 
